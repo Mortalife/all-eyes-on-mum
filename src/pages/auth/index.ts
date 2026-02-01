@@ -9,15 +9,15 @@ import {
   isAdminEmail,
   isRegistrationOpen,
   verifyUserCredentials,
-} from "../../lib/auth/index.js";
+} from "../../lib/auth/index.ts";
 import {
   clearSessionCookie,
   getSessionToken,
   setSessionCookie,
-} from "../../lib/auth/middleware.js";
-import type { HonoContext } from "../../types/hono.js";
-import { Alert, Button, Card, FormField } from "../../ui/index.js";
-import { BaseLayout } from "../../ui/layouts/index.js";
+} from "../../lib/auth/middleware.ts";
+import type { HonoContext } from "../../types/hono.ts";
+import { Alert, Button, Card, FormField } from "../../ui/index.ts";
+import { BaseLayout } from "../../ui/layouts/index.ts";
 
 export const authRouter = new Hono<HonoContext>();
 

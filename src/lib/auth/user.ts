@@ -1,7 +1,11 @@
-import { env } from "../../env.js";
-import type { User } from "../../types/user.js";
-import { client } from "../db.js";
-import { generateSecureRandomString, hashPassword, verifyPassword } from "./crypto.js";
+import { env } from "../../env.ts";
+import type { User } from "../../types/user.ts";
+import { client } from "../db.ts";
+import {
+  generateSecureRandomString,
+  hashPassword,
+  verifyPassword,
+} from "./crypto.ts";
 
 // Creates a new user with specified role
 export const createUser = async (
@@ -104,6 +108,26 @@ export const isRegistrationOpen = async (): Promise<boolean> => {
 // Checks if an email is the configured admin email
 export const isAdminEmail = (email: string): boolean => {
   return email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase();
+};
+
+// Finds a user by ID
+export const findUserById = async (id: string): Promise<User | null> => {
+  const result = await client.execute({
+    sql: "SELECT id, email, name, role, created_at, updated_at FROM user WHERE id = ?",
+    args: [id],
+  });
+
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0];
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    name: row.name as string | null,
+    role: row.role as "admin" | "user",
+    createdAt: new Date((row.created_at as number) * 1000).toISOString(),
+    updatedAt: new Date((row.updated_at as number) * 1000).toISOString(),
+  };
 };
 
 // Gets all users (for admin)

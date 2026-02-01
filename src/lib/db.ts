@@ -1,5 +1,5 @@
 import { createClient } from "@libsql/client";
-import { env } from "../env.js";
+import { env } from "../env.ts";
 
 // Resolves the database path
 const getDatabaseUrl = () => {

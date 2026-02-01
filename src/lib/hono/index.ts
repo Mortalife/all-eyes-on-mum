@@ -1,1 +1,1 @@
-export { compressionMiddleware } from "./compression.js";
+export { compressionMiddleware } from "./compression.ts";

@@ -1,11 +1,11 @@
-import type { User } from "../../types/user.js";
-import type { Session } from "../../types/hono.js";
-import { client } from "../db.js";
+import type { User } from "../../types/user.ts";
+import type { Session } from "../../types/hono.ts";
+import { client } from "../db.ts";
 import {
   constantTimeEqual,
   generateSecureRandomString,
   hashSecret,
-} from "./crypto.js";
+} from "./crypto.ts";
 
 // Session expiry: 30 days
 const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
@@ -66,7 +66,7 @@ export const validateSessionToken = async (
   }
 
   // Verify the secret using constant-time comparison
-  const storedHash = row.secret_hash as Uint8Array;
+  const storedHash = Buffer.from(row.secret_hash as string);
   const tokenSecretHash = await hashSecret(sessionSecret);
 
   if (!constantTimeEqual(tokenSecretHash, storedHash)) {

@@ -7,7 +7,9 @@ export const isDatastarSSERequest = (req: Request): boolean => {
 };
 
 // Creates a patch element SSE event
-export const patchElementEvent = (html: HtmlEscapedString | string): string => {
+export const patchElementEvent = (
+  html: HtmlEscapedString | Promise<HtmlEscapedString>,
+): string => {
   const htmlString = typeof html === "string" ? html : html.toString();
   const lines = htmlString.split("\n").map((line) => `data: elements ${line}`);
   return `event: datastar-patch-elements\n${lines.join("\n")}\n\n`;
@@ -36,7 +38,7 @@ export const executeScriptEvent = (script: string): string => {
 // Helper to send element patch via stream
 export const sendElement = async (
   stream: WritableStreamDefaultWriter<Uint8Array>,
-  html: HtmlEscapedString | string,
+  html: HtmlEscapedString | Promise<HtmlEscapedString>,
 ) => {
   const encoder = new TextEncoder();
   await stream.write(encoder.encode(patchElementEvent(html)));

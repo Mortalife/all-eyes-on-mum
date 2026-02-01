@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import type { HonoContext } from "../../types/hono.js";
-import { Button } from "../../ui/index.js";
-import { BaseLayout } from "../../ui/layouts/index.js";
+import type { HonoContext } from "../../types/hono.ts";
+import { Button } from "../../ui/index.ts";
+import { BaseLayout } from "../../ui/layouts/index.ts";
 
 export const marketingRouter = new Hono<HonoContext>();
 
@@ -18,8 +18,16 @@ marketingRouter.get("/", (c) => {
               <h1 class="text-5xl font-bold">All Eyes on Mum</h1>
               <p class="py-6">Welcome to your new application.</p>
               <div class="flex gap-4 justify-center">
-                ${Button({ children: "Get Started", href: "/app", variant: "primary" })}
-                ${Button({ children: "Learn More", href: "#features", variant: "ghost" })}
+                ${Button({
+                  children: "Get Started",
+                  href: "/app",
+                  variant: "primary",
+                })}
+                ${Button({
+                  children: "Learn More",
+                  href: "#features",
+                  variant: "ghost",
+                })}
               </div>
             </div>
           </div>

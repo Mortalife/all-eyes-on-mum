@@ -1,6 +1,6 @@
-import type { User } from "../../types/user.js";
-import type { CommandDefinition } from "./define.js";
-import { eventBus } from "./event-bus.js";
+import type { User } from "../../types/user.ts";
+import type { CommandDefinition } from "./define.ts";
+import { eventBus } from "./event-bus.ts";
 
 type QueuedCommand = {
   definition: CommandDefinition<unknown, unknown>;
@@ -56,7 +56,10 @@ class CommandStore {
 
     this.processing = true;
     try {
-      const result = await command.definition.handler(command.user, command.data);
+      const result = await command.definition.handler(
+        command.user,
+        command.data,
+      );
 
       // Emit event on success
       if (command.definition.emits) {

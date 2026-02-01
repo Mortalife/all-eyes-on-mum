@@ -1,8 +1,8 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import type { HonoContext } from "../../types/hono.js";
-import { env } from "../../env.js";
-import { validateSessionToken, extendSession } from "./session.js";
+import type { HonoContext } from "../../types/hono.ts";
+import { env } from "../../env.ts";
+import { validateSessionToken, extendSession } from "./session.ts";
 
 const SESSION_COOKIE_NAME = "session";
 
@@ -31,7 +31,10 @@ export const getSessionToken = (c: Context): string | undefined => {
 };
 
 // Middleware that loads user and session from cookie
-export const sessionMiddleware: MiddlewareHandler<HonoContext> = async (c, next) => {
+export const sessionMiddleware: MiddlewareHandler<HonoContext> = async (
+  c,
+  next,
+) => {
   const token = getSessionToken(c);
 
   if (!token) {

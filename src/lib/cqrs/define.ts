@@ -1,4 +1,4 @@
-import type { User } from "../../types/user.js";
+import type { User } from "../../types/user.ts";
 
 // Defines the shape of a command
 export type CommandDefinition<TData, TResult> = {

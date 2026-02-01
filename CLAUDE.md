@@ -692,8 +692,6 @@ handler: async (user, data) => {
 - Use DaisyUI semantic classes (e.g., `text-base-content/60`) over raw colors
 - Prefer DaisyUI variants (`btn-primary`, `alert-success`) over custom styling
 
-
-
 ## Type Location Guidelines
 
 | Type Category            | Location                     |

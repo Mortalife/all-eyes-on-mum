@@ -1,2 +1,2 @@
-export { AppLayout } from "./AppLayout.js";
-export { BaseLayout } from "./BaseLayout.js";
+export { AppLayout } from "./AppLayout.ts";
+export { BaseLayout } from "./BaseLayout.ts";

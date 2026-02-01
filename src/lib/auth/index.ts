@@ -1,4 +1,4 @@
-export { hashPassword, verifyPassword } from "./crypto.js";
+export { hashPassword, verifyPassword } from "./crypto.ts";
 export {
   clearSessionCookie,
   getSessionToken,
@@ -6,22 +6,23 @@ export {
   requireRole,
   sessionMiddleware,
   setSessionCookie,
-} from "./middleware.js";
-export { initAuthTables } from "./schema.js";
+} from "./middleware.ts";
+export { initAuthTables } from "./schema.ts";
 export {
   createSession,
   deleteSession,
   deleteUserSessions,
   extendSession,
   validateSessionToken,
-} from "./session.js";
+} from "./session.ts";
 export {
   adminExists,
   createUser,
   emailExists,
   findUserByEmail,
+  findUserById,
   getAllUsers,
   isAdminEmail,
   isRegistrationOpen,
   verifyUserCredentials,
-} from "./user.js";
+} from "./user.ts";

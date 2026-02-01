@@ -1,11 +1,18 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
+import { Sidequest } from "sidequest";
 import { z } from "zod";
-import { createUser, emailExists, getAllUsers, requireRole } from "../../lib/auth/index.js";
-import type { HonoContext } from "../../types/hono.js";
-import type { User } from "../../types/user.js";
-import { Alert, Button, Card, FormField, PageHeader } from "../../ui/index.js";
-import { AppLayout } from "../../ui/layouts/index.js";
+import { DailyReminderJob } from "../../jobs/daily-reminder-job.ts";
+import {
+  createUser,
+  emailExists,
+  getAllUsers,
+  requireRole,
+} from "../../lib/auth/index.ts";
+import type { HonoContext } from "../../types/hono.ts";
+import type { User } from "../../types/user.ts";
+import { Alert, Button, Card, FormField, PageHeader } from "../../ui/index.ts";
+import { AppLayout } from "../../ui/layouts/index.ts";
 
 export const adminRouter = new Hono<HonoContext>();
 
@@ -38,7 +45,11 @@ const UsersTable = ({ users }: { users: User[] }) => html`
               <td>${user.name || "-"}</td>
               <td>${user.email}</td>
               <td>
-                <span class="badge ${user.role === "admin" ? "badge-primary" : "badge-ghost"}">
+                <span
+                  class="badge ${user.role === "admin"
+                    ? "badge-primary"
+                    : "badge-ghost"}"
+                >
                   ${user.role}
                 </span>
               </td>
@@ -65,7 +76,11 @@ const CreateUserForm = ({
 }) => html`
   ${error ? Alert({ type: "error", message: error }) : ""}
   ${success ? Alert({ type: "success", message: success }) : ""}
-  <form method="POST" action="/admin/users/create" class="space-y-4 ${error || success ? "mt-4" : ""}">
+  <form
+    method="POST"
+    action="/admin/users/create"
+    class="space-y-4 ${error || success ? "mt-4" : ""}"
+  >
     ${FormField({
       label: "Name",
       htmlFor: "name",
@@ -137,7 +152,10 @@ adminRouter.get("/users", async (c) => {
               children: html`
                 <div class="card-body">
                   <h2 class="card-title">Add Family Member</h2>
-                  ${CreateUserForm({ success: success === "1" ? "User created successfully" : undefined })}
+                  ${CreateUserForm({
+                    success:
+                      success === "1" ? "User created successfully" : undefined,
+                  })}
                 </div>
               `,
             })}
@@ -267,4 +285,15 @@ adminRouter.post("/users/create", async (c) => {
   await createUser(parsed.data.email, parsed.data.password, parsed.data.name);
 
   return c.redirect("/admin/users?success=1");
+});
+
+// Manually trigger the daily reminder job for testing
+adminRouter.post("/jobs/run-reminders", async (c) => {
+  try {
+    await Sidequest.build(DailyReminderJob).queue("reminders").enqueue();
+    return c.json({ success: true, message: "Daily reminder job queued" });
+  } catch (error) {
+    console.error("Failed to enqueue reminder job:", error);
+    return c.json({ success: false, error: String(error) }, 500);
+  }
 });

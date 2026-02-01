@@ -1,4 +1,4 @@
-import { client } from "../db.js";
+import { client } from "../db.ts";
 
 // Initializes auth tables
 export const initAuthTables = async () => {

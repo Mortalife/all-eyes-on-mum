@@ -1,18 +1,20 @@
 import type { Context } from "hono";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { HonoContext } from "../../types/hono.js";
-import type { User } from "../../types/user.js";
-import { patchElementEvent } from "../datastar.js";
-import { eventBus } from "./event-bus.js";
+import type { HonoContext } from "../../types/hono.ts";
+import type { User } from "../../types/user.ts";
+import { patchElementEvent } from "../datastar.ts";
+import { eventBus } from "./event-bus.ts";
 
 type SSEResourceOptions<TState> = {
   loadState: (user: User, c: Context<HonoContext>) => Promise<TState>;
-  render: (state: TState) => HtmlEscapedString | string;
+  render: (state: TState) => HtmlEscapedString | Promise<HtmlEscapedString>;
   eventTypes: string[];
 };
 
 // Creates an SSE handler that re-renders on events
-export const createSSEResource = <TState>(options: SSEResourceOptions<TState>) => {
+export const createSSEResource = <TState>(
+  options: SSEResourceOptions<TState>,
+) => {
   return async (c: Context<HonoContext>) => {
     const user = c.get("user");
     if (!user) {
@@ -27,7 +29,7 @@ export const createSSEResource = <TState>(options: SSEResourceOptions<TState>) =
     const sendState = async () => {
       try {
         const state = await options.loadState(user, c);
-        const html = options.render(state);
+        const html = await options.render(state);
         await writer.write(encoder.encode(patchElementEvent(html)));
       } catch (error) {
         console.error("SSE render error:", error);
@@ -40,7 +42,11 @@ export const createSSEResource = <TState>(options: SSEResourceOptions<TState>) =
     // Subscribes to events and re-renders
     const unsubscribe = eventBus.subscribeToUser(user.id, (payload) => {
       const event = payload as { type: string };
-      if (options.eventTypes.some((t) => event.type.startsWith(t.replace("*", "")))) {
+      if (
+        options.eventTypes.some((t) =>
+          event.type.startsWith(t.replace("*", "")),
+        )
+      ) {
         sendState();
       }
     });
