@@ -12,7 +12,14 @@ import {
   getHealthNotesByCategory,
   searchHealthNotes,
 } from "../../lib/health-notes/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  createSSEResource,
+  formErrorStore,
+  handleFormPost,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   getNotifications,
   getUnreadCount,
@@ -260,11 +267,15 @@ const HealthNoteForm = (props: {
   note?: HealthNote;
   action: string;
   submitLabel: string;
+  errors: FormErrors | null;
 }) => {
-  const { note, action, submitLabel } = props;
+  const { note, action, submitLabel, errors } = props;
   const today = new Date().toISOString().split("T")[0];
 
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('${action}')"
       data-signals="${JSON.stringify({
@@ -278,6 +289,7 @@ const HealthNoteForm = (props: {
         ${FormField({
           label: "Title",
           htmlFor: "title",
+          error: errors?.fieldErrors?.title?.[0],
           children: html`
             <input
               type="text"
@@ -293,6 +305,7 @@ const HealthNoteForm = (props: {
         ${FormField({
           label: "Date",
           htmlFor: "date",
+          error: errors?.fieldErrors?.date?.[0],
           children: html`
             <input
               type="date"
@@ -307,6 +320,7 @@ const HealthNoteForm = (props: {
         ${FormField({
           label: "Category",
           htmlFor: "category",
+          error: errors?.fieldErrors?.category?.[0],
           children: html`
             <select
               id="category"
@@ -327,6 +341,7 @@ const HealthNoteForm = (props: {
           ${FormField({
             label: "Content",
             htmlFor: "content",
+            error: errors?.fieldErrors?.content?.[0],
             children: html`
               <textarea
                 id="content"
@@ -507,6 +522,54 @@ healthRouter.get("/sse", async (c) => {
   })(c);
 });
 
+// Form page state type for create/edit pages
+type HealthNoteFormPageState = {
+  note?: HealthNote;
+  action: string;
+  submitLabel: string;
+  formErrors: FormErrors | null;
+};
+
+// Health note form content renderer (used by SSE for create/edit pages)
+const renderHealthNoteFormContent = (state: HealthNoteFormPageState) => html`
+  <div id="health-form-content">
+    ${Card({
+      children: html`
+        <div class="card-body">
+          ${HealthNoteForm({
+            note: state.note,
+            action: state.action,
+            submitLabel: state.submitLabel,
+            errors: state.formErrors,
+          })}
+        </div>
+      `,
+    })}
+  </div>
+`;
+
+// Health note form resource (manages SSE + POST for create/edit)
+const healthNoteFormResource = createFormResource({
+  path: "/app/health/form/sse",
+  schema: healthNoteFormSchema,
+  command: createHealthNoteCommand,
+  eventTypes: ["healthNote.*"],
+  successRedirect: "/app/health",
+  loadState: async (_user, c, cid) => {
+    const editId = c.req.query("editId");
+    const note = editId ? await getHealthNote(editId) : undefined;
+    return {
+      note: note || undefined,
+      action: editId ? `/app/health/${editId}` : "/app/health",
+      submitLabel: editId ? "Save Changes" : "Add Note",
+      formErrors: formErrorStore.getErrors(cid),
+    };
+  },
+  render: renderHealthNoteFormContent,
+});
+
+healthRouter.post("/form/sse", healthNoteFormResource.sseHandler);
+
 // New health note page
 healthRouter.get("/new", async (c) => {
   const user = c.get("user")!;
@@ -527,35 +590,20 @@ healthRouter.get("/new", async (c) => {
           description:
             "Record health information like medication changes, GP visits, or hospital stays",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${HealthNoteForm({
-                action: "/app/health",
-                submitLabel: "Add Note",
-              })}
-            </div>
-          `,
-        })}
+        ${healthNoteFormResource.container(
+          renderHealthNoteFormContent({
+            action: "/app/health",
+            submitLabel: "Add Note",
+            formErrors: null,
+          }),
+        )}
       `,
     }),
   );
 });
 
 // Create health note
-healthRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = healthNoteFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createHealthNoteCommand, user, result.data);
-
-  return c.redirect("/app/health");
-});
+healthRouter.post("/", healthNoteFormResource.postHandler);
 
 // Health note detail content renderer
 const renderHealthNoteDetailContent = (state: HealthNoteDetailPageState) => {
@@ -711,7 +759,9 @@ healthRouter.get("/:id", async (c) => {
           })}
         </div>
         <div data-init="@get('/app/health/${id}/sse')">
-          ${renderHealthNoteDetailContent({ note })}
+          ${renderHealthNoteDetailContent({
+            note,
+          })}
         </div>
       `,
     }),
@@ -725,13 +775,12 @@ healthRouter.get("/:id/sse", async (c) => {
   return createSSEResource({
     loadState: async (): Promise<HealthNoteDetailPageState> => {
       const note = await getHealthNote(id);
-      if (!note) {
-        throw new Error("Health note not found");
-      }
+      if (!note) throw new Error("Health note not found");
       return { note };
     },
     render: renderHealthNoteDetailContent,
     eventTypes: ["healthNote.*"],
+    errorRedirect: "/app/health",
   })(c);
 });
 
@@ -761,40 +810,29 @@ healthRouter.get("/:id/edit", async (c) => {
           title: `Edit Health Note`,
           description: "Update health note details",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${HealthNoteForm({
-                note,
-                action: `/app/health/${id}`,
-                submitLabel: "Save Changes",
-              })}
-            </div>
-          `,
-        })}
+        ${healthNoteFormResource.container(
+          renderHealthNoteFormContent({
+            note,
+            action: `/app/health/${id}`,
+            submitLabel: "Save Changes",
+            formErrors: null,
+          }),
+          `/app/health/form/sse?editId=${id}`,
+        )}
       `,
     }),
   );
 });
 
 // Update health note
-healthRouter.post("/:id", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = healthNoteFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(updateHealthNoteCommand, user, {
-    id,
-    ...result.data,
-  });
-
-  return c.redirect(`/app/health/${id}`);
-});
+healthRouter.post(
+  "/:id",
+  handleFormPost({
+    schema: healthNoteFormSchema,
+    command: updateHealthNoteCommand,
+    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+  }),
+);
 
 // Delete health note
 healthRouter.post("/:id/delete", async (c) => {
@@ -803,5 +841,5 @@ healthRouter.post("/:id/delete", async (c) => {
 
   commandStore.enqueue(deleteHealthNoteCommand, user, { id });
 
-  return c.redirect("/app/health");
+  return c.body(null, 204);
 });

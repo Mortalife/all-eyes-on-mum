@@ -15,11 +15,18 @@ import {
   getSessionToken,
   setSessionCookie,
 } from "../../lib/auth/middleware.ts";
+import { rateLimit } from "../../lib/auth/rate-limit.ts";
 import type { HonoContext } from "../../types/hono.ts";
 import { Alert, Button, Card, FormField } from "../../ui/index.ts";
 import { BaseLayout } from "../../ui/layouts/index.ts";
 
 export const authRouter = new Hono<HonoContext>();
+
+const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 });
+const registerRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  maxRequests: 5,
+});
 
 // Validation schemas
 const loginSchema = z.object({
@@ -212,7 +219,7 @@ authRouter.get("/login", async (c) => {
 });
 
 // Login handler
-authRouter.post("/login", async (c) => {
+authRouter.post("/login", loginRateLimit, async (c) => {
   const formData = await c.req.formData();
   const data = {
     email: formData.get("email") as string,
@@ -300,7 +307,7 @@ authRouter.get("/register", async (c) => {
 });
 
 // Register handler
-authRouter.post("/register", async (c) => {
+authRouter.post("/register", registerRateLimit, async (c) => {
   const formData = await c.req.formData();
   const data = {
     name: formData.get("name") as string,

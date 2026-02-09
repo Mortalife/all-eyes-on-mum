@@ -11,7 +11,14 @@ import {
   getContract,
   getTotalMonthlyExpenditure,
 } from "../../lib/contracts/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  createSSEResource,
+  formErrorStore,
+  handleFormPost,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   getNotifications,
   getUnreadCount,
@@ -230,10 +237,14 @@ const ContractForm = (props: {
   contract?: Contract;
   action: string;
   submitLabel: string;
+  errors: FormErrors | null;
 }) => {
-  const { contract, action, submitLabel } = props;
+  const { contract, action, submitLabel, errors } = props;
 
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('${action}')"
       data-signals="${JSON.stringify({
@@ -252,6 +263,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Contract Name",
           htmlFor: "name",
+          error: errors?.fieldErrors?.name?.[0],
           children: html`
             <input
               type="text"
@@ -267,6 +279,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Provider",
           htmlFor: "provider",
+          error: errors?.fieldErrors?.provider?.[0],
           children: html`
             <input
               type="text"
@@ -281,6 +294,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Monthly Amount",
           htmlFor: "monthlyAmount",
+          error: errors?.fieldErrors?.monthlyAmount?.[0],
           children: html`
             <input
               type="number"
@@ -297,6 +311,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Payment Method",
           htmlFor: "paymentMethod",
+          error: errors?.fieldErrors?.paymentMethod?.[0],
           children: html`
             <select
               id="paymentMethod"
@@ -314,6 +329,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Category",
           htmlFor: "category",
+          error: errors?.fieldErrors?.category?.[0],
           children: html`
             <select
               id="category"
@@ -333,6 +349,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Contract Start Date",
           htmlFor: "contractStartDate",
+          error: errors?.fieldErrors?.contractStartDate?.[0],
           children: html`
             <input
               type="date"
@@ -346,6 +363,7 @@ const ContractForm = (props: {
         ${FormField({
           label: "Contract End Date",
           htmlFor: "contractEndDate",
+          error: errors?.fieldErrors?.contractEndDate?.[0],
           children: html`
             <input
               type="date"
@@ -384,6 +402,7 @@ const ContractForm = (props: {
           ${FormField({
             label: "Notes",
             htmlFor: "notes",
+            error: errors?.fieldErrors?.notes?.[0],
             children: html`
               <textarea
                 id="notes"
@@ -523,6 +542,55 @@ contractsRouter.get(
   }),
 );
 
+// Form state type for create/edit pages
+type ContractFormPageState = {
+  contract?: Contract;
+  action: string;
+  submitLabel: string;
+  formErrors: FormErrors | null;
+};
+
+// Contract form content renderer (used by SSE for create/edit pages)
+const renderContractFormContent = (state: ContractFormPageState) => html`
+  <div id="contract-form-content">
+    ${Card({
+      children: html`
+        <div class="card-body">
+          ${ContractForm({
+            contract: state.contract,
+            action: state.action,
+            submitLabel: state.submitLabel,
+            errors: state.formErrors,
+          })}
+        </div>
+      `,
+    })}
+  </div>
+`;
+
+// Contract form resource (shared by create and edit pages)
+const contractFormResource = createFormResource({
+  path: "/app/contracts/form/sse",
+  schema: contractFormSchema,
+  command: createContractCommand,
+  eventTypes: ["contract.*"],
+  successRedirect: "/app/contracts",
+  loadState: async (_user, c, cid) => {
+    const editId = c.req.query("editId");
+    const contract = editId ? await getContract(editId) : undefined;
+    return {
+      contract: contract || undefined,
+      action: editId ? `/app/contracts/${editId}` : "/app/contracts",
+      submitLabel: editId ? "Save Changes" : "Add Contract",
+      formErrors: formErrorStore.getErrors(cid),
+    };
+  },
+  render: renderContractFormContent,
+});
+
+// Contract form SSE endpoint
+contractsRouter.post("/form/sse", contractFormResource.sseHandler);
+
 // New contract page
 contractsRouter.get("/new", async (c) => {
   const user = c.get("user")!;
@@ -542,35 +610,20 @@ contractsRouter.get("/new", async (c) => {
           title: "Add New Contract",
           description: "Add a recurring contract or subscription to track",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${ContractForm({
-                action: "/app/contracts",
-                submitLabel: "Add Contract",
-              })}
-            </div>
-          `,
-        })}
+        ${contractFormResource.container(
+          renderContractFormContent({
+            action: "/app/contracts",
+            submitLabel: "Add Contract",
+            formErrors: null,
+          }),
+        )}
       `,
     }),
   );
 });
 
 // Create contract
-contractsRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = contractFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createContractCommand, user, result.data);
-
-  return c.redirect("/app/contracts");
-});
+contractsRouter.post("/", contractFormResource.postHandler);
 
 // Contract detail content renderer
 const renderContractDetailContent = (state: ContractDetailPageState) => {
@@ -768,7 +821,9 @@ contractsRouter.get("/:id", async (c) => {
           })}
         </div>
         <div data-init="@get('/app/contracts/${id}/sse')">
-          ${renderContractDetailContent({ contract })}
+          ${renderContractDetailContent({
+            contract,
+          })}
         </div>
       `,
     }),
@@ -789,6 +844,7 @@ contractsRouter.get("/:id/sse", async (c) => {
     },
     render: renderContractDetailContent,
     eventTypes: ["contract.*"],
+    errorRedirect: "/app/contracts",
   })(c);
 });
 
@@ -818,40 +874,29 @@ contractsRouter.get("/:id/edit", async (c) => {
           title: `Edit ${contract.name}`,
           description: "Update contract details",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${ContractForm({
-                contract,
-                action: `/app/contracts/${id}`,
-                submitLabel: "Save Changes",
-              })}
-            </div>
-          `,
-        })}
+        ${contractFormResource.container(
+          renderContractFormContent({
+            contract,
+            action: `/app/contracts/${id}`,
+            submitLabel: "Save Changes",
+            formErrors: null,
+          }),
+          `/app/contracts/form/sse?editId=${id}`,
+        )}
       `,
     }),
   );
 });
 
 // Update contract
-contractsRouter.post("/:id", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = contractFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(updateContractCommand, user, {
-    id,
-    ...result.data,
-  });
-
-  return c.redirect(`/app/contracts/${id}`);
-});
+contractsRouter.post(
+  "/:id",
+  handleFormPost({
+    schema: contractFormSchema,
+    command: updateContractCommand,
+    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+  }),
+);
 
 // Delete contract
 contractsRouter.post("/:id/delete", async (c) => {
@@ -860,5 +905,5 @@ contractsRouter.post("/:id/delete", async (c) => {
 
   commandStore.enqueue(deleteContractCommand, user, { id });
 
-  return c.redirect("/app/contracts");
+  return c.body(null, 204);
 });

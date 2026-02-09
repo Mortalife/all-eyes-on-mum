@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { z } from "zod";
 import { findUserById } from "../../lib/auth/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  formErrorStore,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   createNoteCommand,
   deleteNoteCommand,
@@ -138,7 +143,7 @@ const groupNotesByDate = (
 };
 
 // Renders the quick add form
-const QuickAddForm = () => html`
+const QuickAddForm = ({ errors }: { errors: FormErrors | null }) => html`
   <div class="mb-6" data-signals="${JSON.stringify({ content: "" })}">
     <form data-on:submit="@post('/app/notes')" class="flex gap-2">
       <label for="note-content" class="sr-only">Add a quick note</label>
@@ -146,13 +151,23 @@ const QuickAddForm = () => html`
         type="text"
         id="note-content"
         name="content"
-        class="input input-bordered flex-1"
+        class="input input-bordered flex-1 ${errors?.fieldErrors?.content
+          ? "input-error"
+          : ""}"
         placeholder="Add a quick note... (e.g., Boiler's making a noise)"
         data-bind="content"
         autofocus
       />
       ${Button({ type: "submit", children: "Add" })}
     </form>
+    ${errors?.fieldErrors?.content
+      ? html`<p class="text-error text-sm mt-1">
+          ${errors.fieldErrors.content[0]}
+        </p>`
+      : ""}
+    ${errors?.formErrors?.length
+      ? html`<p class="text-error text-sm mt-1">${errors.formErrors[0]}</p>`
+      : ""}
   </div>
 `;
 
@@ -330,12 +345,15 @@ const ResolvedNotesSection = (notes: NoteWithAuthor[]) => {
 type NotesPageState = {
   activeNotes: NoteWithAuthor[];
   resolvedNotes: NoteWithAuthor[];
+  formErrors: FormErrors | null;
 };
 
 // Notes content renderer
 const renderNotesContent = (state: NotesPageState) => html`
   <div id="notes-content">
-    ${QuickAddForm()}
+    ${QuickAddForm({
+      errors: state.formErrors,
+    })}
     ${Card({
       children: html`
         <div class="card-body">
@@ -367,7 +385,9 @@ const renderNotesContent = (state: NotesPageState) => html`
 `;
 
 // Loads page state
-const loadNotesPageState = async (): Promise<NotesPageState> => {
+const loadNotesPageState = async (
+  connectionId: string,
+): Promise<NotesPageState> => {
   const [activeNotes, resolvedNotes] = await Promise.all([
     getActiveNotes(),
     getResolvedNotes(20),
@@ -381,15 +401,15 @@ const loadNotesPageState = async (): Promise<NotesPageState> => {
   return {
     activeNotes: activeWithAuthors,
     resolvedNotes: resolvedWithAuthors,
+    formErrors: formErrorStore.getErrors(connectionId),
   };
 };
 
 // Notes list page
 notesRouter.get("/", async (c) => {
   const user = c.get("user")!;
-
   const [state, notifications, unreadCount] = await Promise.all([
-    loadNotesPageState(),
+    loadNotesPageState(""),
     getNotifications(user.id, 5),
     getUnreadCount(user.id),
   ]);
@@ -406,40 +426,27 @@ notesRouter.get("/", async (c) => {
           description:
             "Quick notes for the family - things to remember, observations, reminders",
         })}
-        <div data-init="@get('/app/notes/sse')">
-          ${renderNotesContent(state)}
-        </div>
+        ${notesForm.container(renderNotesContent(state))}
       `,
     }),
   );
 });
 
+// Form resource for note creation + SSE
+const notesForm = createFormResource({
+  path: "/app/notes/sse",
+  schema: noteFormSchema,
+  command: createNoteCommand,
+  eventTypes: ["note.*", "notification.*"],
+  loadState: (_user, _c, cid) => loadNotesPageState(cid),
+  render: renderNotesContent,
+});
+
 // Notes SSE endpoint
-notesRouter.get(
-  "/sse",
-  createSSEResource({
-    loadState: loadNotesPageState,
-    render: renderNotesContent,
-    eventTypes: ["note.*"],
-  }),
-);
+notesRouter.post("/sse", notesForm.sseHandler);
 
 // Create note
-notesRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = noteFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createNoteCommand, user, {
-    content: result.data.content,
-  });
-
-  return c.body(null, 204);
-});
+notesRouter.post("/", notesForm.postHandler);
 
 // Resolve note
 notesRouter.post("/:id/resolve", async (c) => {

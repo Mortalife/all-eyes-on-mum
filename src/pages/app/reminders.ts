@@ -2,7 +2,14 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { z } from "zod";
 import { getContract } from "../../lib/contracts/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  createSSEResource,
+  formErrorStore,
+  handleFormPost,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   getNotifications,
   getUnreadCount,
@@ -224,15 +231,19 @@ const ReminderForm = (props: {
   reminder?: RecurringReminder;
   action: string;
   submitLabel: string;
+  errors: FormErrors | null;
   prefill?: {
     title?: string;
     linkedEntityType?: string;
     linkedEntityId?: string;
   };
 }) => {
-  const { reminder, action, submitLabel, prefill } = props;
+  const { reminder, action, submitLabel, errors, prefill } = props;
 
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('${action}')"
       data-signals="${JSON.stringify({
@@ -250,6 +261,7 @@ const ReminderForm = (props: {
         ${FormField({
           label: "Title",
           htmlFor: "title",
+          error: errors?.fieldErrors?.title?.[0],
           children: html`
             <input
               type="text"
@@ -265,6 +277,7 @@ const ReminderForm = (props: {
         ${FormField({
           label: "Frequency",
           htmlFor: "frequency",
+          error: errors?.fieldErrors?.frequency?.[0],
           children: html`
             <select
               id="frequency"
@@ -284,6 +297,7 @@ const ReminderForm = (props: {
         ${FormField({
           label: "Next Due Date",
           htmlFor: "nextDue",
+          error: errors?.fieldErrors?.nextDue?.[0],
           children: html`
             <input
               type="date"
@@ -300,6 +314,7 @@ const ReminderForm = (props: {
           ${FormField({
             label: "Description",
             htmlFor: "description",
+            error: errors?.fieldErrors?.description?.[0],
             children: html`
               <textarea
                 id="description"
@@ -461,6 +476,75 @@ remindersRouter.get(
   }),
 );
 
+// Form state type for create/edit pages
+type ReminderFormPageState = {
+  reminder?: RecurringReminder;
+  action: string;
+  submitLabel: string;
+  formErrors: FormErrors | null;
+  prefill?: {
+    title?: string;
+    linkedEntityType?: string;
+    linkedEntityId?: string;
+  };
+};
+
+// Reminder form content renderer (used by SSE for create/edit pages)
+const renderReminderFormContent = (state: ReminderFormPageState) => html`
+  <div id="reminder-form-content">
+    ${Card({
+      children: html`
+        <div class="card-body">
+          ${ReminderForm({
+            reminder: state.reminder,
+            action: state.action,
+            submitLabel: state.submitLabel,
+            errors: state.formErrors,
+            prefill: state.prefill,
+          })}
+        </div>
+      `,
+    })}
+  </div>
+`;
+
+// Reminder form resource (handles SSE + POST for create)
+const reminderFormResource = createFormResource({
+  path: "/app/reminders/form/sse",
+  schema: reminderFormSchema,
+  command: createReminderCommand,
+  eventTypes: ["reminder.*"],
+  successRedirect: "/app/reminders",
+  loadState: async (_user, c, cid) => {
+    const editId = c.req.query("editId");
+    const reminder = editId ? await getReminder(editId) : undefined;
+    const prefillTitle = c.req.query("prefillTitle") || undefined;
+    const prefillLinkedEntityType =
+      c.req.query("prefillLinkedEntityType") || undefined;
+    const prefillLinkedEntityId =
+      c.req.query("prefillLinkedEntityId") || undefined;
+    return {
+      reminder: reminder || undefined,
+      action: editId ? `/app/reminders/${editId}` : "/app/reminders",
+      submitLabel: editId ? "Save Changes" : "Add Reminder",
+      formErrors: formErrorStore.getErrors(cid),
+      prefill:
+        !editId &&
+        (prefillTitle || prefillLinkedEntityType || prefillLinkedEntityId)
+          ? {
+              title: prefillTitle,
+              linkedEntityType: prefillLinkedEntityType,
+              linkedEntityId: prefillLinkedEntityId,
+            }
+          : undefined,
+    };
+  },
+  render: renderReminderFormContent,
+});
+
+// Reminder form SSE endpoint (shared by create and edit pages)
+remindersRouter.post("/form/sse", reminderFormResource.sseHandler);
+
 // New reminder page
 remindersRouter.get("/new", async (c) => {
   const user = c.get("user")!;
@@ -474,6 +558,12 @@ remindersRouter.get("/new", async (c) => {
   const linkedEntityType = c.req.query("linkedEntityType") || undefined;
   const linkedEntityId = c.req.query("linkedEntityId") || undefined;
 
+  const sseParams = new URLSearchParams();
+  if (title) sseParams.set("prefillTitle", title);
+  if (linkedEntityType)
+    sseParams.set("prefillLinkedEntityType", linkedEntityType);
+  if (linkedEntityId) sseParams.set("prefillLinkedEntityId", linkedEntityId);
+
   return c.html(
     AppLayout({
       title: "Add Reminder - All Eyes on Mum",
@@ -485,36 +575,22 @@ remindersRouter.get("/new", async (c) => {
           title: "Add New Reminder",
           description: "Create a recurring reminder for periodic tasks",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${ReminderForm({
-                action: "/app/reminders",
-                submitLabel: "Add Reminder",
-                prefill: { title, linkedEntityType, linkedEntityId },
-              })}
-            </div>
-          `,
-        })}
+        ${reminderFormResource.container(
+          renderReminderFormContent({
+            action: "/app/reminders",
+            submitLabel: "Add Reminder",
+            formErrors: null,
+            prefill: { title, linkedEntityType, linkedEntityId },
+          }),
+          `/app/reminders/form/sse?${sseParams.toString()}`,
+        )}
       `,
     }),
   );
 });
 
 // Create reminder
-remindersRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = reminderFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createReminderCommand, user, result.data);
-
-  return c.redirect("/app/reminders");
-});
+remindersRouter.post("/", reminderFormResource.postHandler);
 
 // Reminder detail content renderer
 const renderReminderDetailContent = (state: ReminderDetailPageState) => {
@@ -701,7 +777,10 @@ remindersRouter.get("/:id", async (c) => {
           })}
         </div>
         <div data-init="@get('/app/reminders/${id}/sse')">
-          ${renderReminderDetailContent({ reminder, linkedContract })}
+          ${renderReminderDetailContent({
+            reminder,
+            linkedContract,
+          })}
         </div>
       `,
     }),
@@ -709,11 +788,11 @@ remindersRouter.get("/:id", async (c) => {
 });
 
 // Reminder detail SSE endpoint
-remindersRouter.get("/:id/sse", async (c) => {
-  const id = c.req.param("id");
-
-  return createSSEResource({
-    loadState: async (): Promise<ReminderDetailPageState> => {
+remindersRouter.get(
+  "/:id/sse",
+  createSSEResource({
+    loadState: async (_user, c): Promise<ReminderDetailPageState> => {
+      const id = c.req.param("id");
       const reminder = await getReminder(id);
       if (!reminder) {
         throw new Error("Reminder not found");
@@ -724,12 +803,16 @@ remindersRouter.get("/:id/sse", async (c) => {
         linkedContract = await getContract(reminder.linkedEntityId);
       }
 
-      return { reminder, linkedContract };
+      return {
+        reminder,
+        linkedContract,
+      };
     },
     render: renderReminderDetailContent,
     eventTypes: ["reminder.*", "contract.*"],
-  })(c);
-});
+    errorRedirect: "/app/reminders",
+  }),
+);
 
 // Edit reminder page
 remindersRouter.get("/:id/edit", async (c) => {
@@ -757,40 +840,29 @@ remindersRouter.get("/:id/edit", async (c) => {
           title: `Edit ${reminder.title}`,
           description: "Update reminder details",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${ReminderForm({
-                reminder,
-                action: `/app/reminders/${id}`,
-                submitLabel: "Save Changes",
-              })}
-            </div>
-          `,
-        })}
+        ${reminderFormResource.container(
+          renderReminderFormContent({
+            reminder,
+            action: `/app/reminders/${id}`,
+            submitLabel: "Save Changes",
+            formErrors: null,
+          }),
+          `/app/reminders/form/sse?editId=${id}`,
+        )}
       `,
     }),
   );
 });
 
 // Update reminder
-remindersRouter.post("/:id", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = reminderFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(updateReminderCommand, user, {
-    id,
-    ...result.data,
-  });
-
-  return c.redirect(`/app/reminders/${id}`);
-});
+remindersRouter.post(
+  "/:id",
+  handleFormPost({
+    schema: reminderFormSchema,
+    command: updateReminderCommand,
+    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+  }),
+);
 
 // Trigger reminder (mark as done)
 remindersRouter.post("/:id/trigger", async (c) => {
@@ -829,5 +901,5 @@ remindersRouter.post("/:id/delete", async (c) => {
 
   commandStore.enqueue(deleteReminderCommand, user, { id });
 
-  return c.redirect("/app/reminders");
+  return c.body(null, 204);
 });

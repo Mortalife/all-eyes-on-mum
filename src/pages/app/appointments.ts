@@ -12,7 +12,14 @@ import {
   getPastAppointments,
   getUpcomingAppointments,
 } from "../../lib/appointments/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  createSSEResource,
+  formErrorStore,
+  handleFormPost,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   getNotifications,
   getUnreadCount,
@@ -213,10 +220,14 @@ const AppointmentForm = (props: {
   appointment?: Appointment;
   action: string;
   submitLabel: string;
+  errors: FormErrors | null;
 }) => {
-  const { appointment, action, submitLabel } = props;
+  const { appointment, action, submitLabel, errors } = props;
 
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('${action}')"
       data-signals="${JSON.stringify({
@@ -237,6 +248,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "Title",
           htmlFor: "title",
+          error: errors?.fieldErrors?.title?.[0],
           children: html`
             <input
               type="text"
@@ -251,6 +263,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "Type",
           htmlFor: "type",
+          error: errors?.fieldErrors?.type?.[0],
           children: html`
             <select
               id="type"
@@ -270,6 +283,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "Date & Time",
           htmlFor: "datetime",
+          error: errors?.fieldErrors?.datetime?.[0],
           children: html`
             <input
               type="datetime-local"
@@ -284,6 +298,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "End Time (optional)",
           htmlFor: "endTime",
+          error: errors?.fieldErrors?.endTime?.[0],
           children: html`
             <input
               type="datetime-local"
@@ -297,6 +312,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "Location (optional)",
           htmlFor: "location",
+          error: errors?.fieldErrors?.location?.[0],
           children: html`
             <input
               type="text"
@@ -311,6 +327,7 @@ const AppointmentForm = (props: {
         ${FormField({
           label: "Reminder Days Before",
           htmlFor: "reminderDays",
+          error: errors?.fieldErrors?.reminderDays?.[0],
           children: html`
             <input
               type="number"
@@ -328,6 +345,7 @@ const AppointmentForm = (props: {
           ${FormField({
             label: "Description (optional)",
             htmlFor: "description",
+            error: errors?.fieldErrors?.description?.[0],
             children: html`
               <textarea
                 id="description"
@@ -570,6 +588,59 @@ appointmentsRouter.get(
   }),
 );
 
+// Form state type for create/edit pages
+type AppointmentFormPageState = {
+  appointment?: Appointment;
+  action: string;
+  submitLabel: string;
+  formErrors: FormErrors | null;
+};
+
+// Appointment form content renderer (used by SSE for create/edit pages)
+const renderAppointmentFormContent = (state: AppointmentFormPageState) => html`
+  <div id="appointment-form-content">
+    ${Card({
+      children: html`
+        <div class="card-body">
+          ${AppointmentForm({
+            appointment: state.appointment,
+            action: state.action,
+            submitLabel: state.submitLabel,
+            errors: state.formErrors,
+          })}
+        </div>
+      `,
+    })}
+  </div>
+`;
+
+// Appointment form resource (handles SSE + create POST for the form)
+const appointmentFormResource = createFormResource({
+  path: "/app/appointments/form/sse",
+  schema: appointmentFormSchema,
+  command: createAppointmentCommand,
+  data: (parsed) => ({
+    ...parsed,
+    datetime: new Date(parsed.datetime).toISOString(),
+    endTime: parsed.endTime ? new Date(parsed.endTime).toISOString() : null,
+  }),
+  eventTypes: ["appointment.*"],
+  successRedirect: "/app/appointments",
+  loadState: async (_user, c, cid) => {
+    const editId = c.req.query("editId");
+    const appointment = editId ? await getAppointment(editId) : undefined;
+    return {
+      appointment: appointment || undefined,
+      action: editId ? `/app/appointments/${editId}` : "/app/appointments",
+      submitLabel: editId ? "Save Changes" : "Add Appointment",
+      formErrors: formErrorStore.getErrors(cid),
+    };
+  },
+  render: renderAppointmentFormContent,
+});
+
+appointmentsRouter.post("/form/sse", appointmentFormResource.sseHandler);
+
 // New appointment page
 appointmentsRouter.get("/new", async (c) => {
   const user = c.get("user")!;
@@ -589,49 +660,20 @@ appointmentsRouter.get("/new", async (c) => {
           title: "Add New Appointment",
           description: "Schedule an appointment to track",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${AppointmentForm({
-                action: "/app/appointments",
-                submitLabel: "Add Appointment",
-              })}
-            </div>
-          `,
-        })}
+        ${appointmentFormResource.container(
+          renderAppointmentFormContent({
+            action: "/app/appointments",
+            submitLabel: "Add Appointment",
+            formErrors: null,
+          }),
+        )}
       `,
     }),
   );
 });
 
 // Create appointment
-appointmentsRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = appointmentFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  // Convert datetime-local to ISO string
-  const datetime = new Date(result.data.datetime).toISOString();
-  const endTime = result.data.endTime
-    ? new Date(result.data.endTime).toISOString()
-    : null;
-
-  commandStore.enqueue(createAppointmentCommand, user, {
-    title: result.data.title,
-    description: result.data.description,
-    datetime,
-    endTime,
-    location: result.data.location,
-    type: result.data.type,
-    reminderDays: result.data.reminderDays,
-  });
-
-  return c.redirect("/app/appointments");
-});
+appointmentsRouter.post("/", appointmentFormResource.postHandler);
 
 // Appointment detail content renderer
 const renderAppointmentDetailContent = (state: AppointmentDetailPageState) => {
@@ -825,7 +867,9 @@ appointmentsRouter.get("/:id", async (c) => {
           })}
         </div>
         <div data-init="@get('/app/appointments/${id}/sse')">
-          ${renderAppointmentDetailContent({ appointment })}
+          ${renderAppointmentDetailContent({
+            appointment,
+          })}
         </div>
       `,
     }),
@@ -846,6 +890,7 @@ appointmentsRouter.get("/:id/sse", async (c) => {
     },
     render: renderAppointmentDetailContent,
     eventTypes: ["appointment.*"],
+    errorRedirect: "/app/appointments",
   })(c);
 });
 
@@ -875,52 +920,34 @@ appointmentsRouter.get("/:id/edit", async (c) => {
           title: `Edit ${appointment.title}`,
           description: "Update appointment details",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${AppointmentForm({
-                appointment,
-                action: `/app/appointments/${id}`,
-                submitLabel: "Save Changes",
-              })}
-            </div>
-          `,
-        })}
+        ${appointmentFormResource.container(
+          renderAppointmentFormContent({
+            appointment,
+            action: `/app/appointments/${id}`,
+            submitLabel: "Save Changes",
+            formErrors: null,
+          }),
+          `/app/appointments/form/sse?editId=${id}`,
+        )}
       `,
     }),
   );
 });
 
 // Update appointment
-appointmentsRouter.post("/:id", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = appointmentFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  // Convert datetime-local to ISO string
-  const datetime = new Date(result.data.datetime).toISOString();
-  const endTime = result.data.endTime
-    ? new Date(result.data.endTime).toISOString()
-    : null;
-
-  commandStore.enqueue(updateAppointmentCommand, user, {
-    id,
-    title: result.data.title,
-    description: result.data.description,
-    datetime,
-    endTime,
-    location: result.data.location,
-    type: result.data.type,
-    reminderDays: result.data.reminderDays,
-  });
-
-  return c.redirect(`/app/appointments/${id}`);
-});
+appointmentsRouter.post(
+  "/:id",
+  handleFormPost({
+    schema: appointmentFormSchema,
+    command: updateAppointmentCommand,
+    data: (parsed, c) => ({
+      id: c.req.param("id"),
+      ...parsed,
+      datetime: new Date(parsed.datetime).toISOString(),
+      endTime: parsed.endTime ? new Date(parsed.endTime).toISOString() : null,
+    }),
+  }),
+);
 
 // Delete appointment
 appointmentsRouter.post("/:id/delete", async (c) => {
@@ -929,5 +956,5 @@ appointmentsRouter.post("/:id/delete", async (c) => {
 
   commandStore.enqueue(deleteAppointmentCommand, user, { id });
 
-  return c.redirect("/app/appointments");
+  return c.body(null, 204);
 });

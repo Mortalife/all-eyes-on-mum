@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import type { HtmlEscapedString } from "hono/utils/html";
 import { z } from "zod";
 import {
   createBillCommand,
@@ -13,7 +12,14 @@ import {
   getBill,
   getBillPayments,
 } from "../../lib/bills/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  createSSEResource,
+  formErrorStore,
+  handleFormPost,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   getNotifications,
   getUnreadCount,
@@ -25,7 +31,6 @@ import type {
   BillPayment,
 } from "../../types/bill.ts";
 import type { HonoContext } from "../../types/hono.ts";
-import type { User } from "../../types/user.ts";
 import { Button, Card, FormField, PageHeader } from "../../ui/index.ts";
 import { AppLayout } from "../../ui/layouts/index.ts";
 
@@ -217,10 +222,14 @@ const BillForm = (props: {
   bill?: Bill;
   action: string;
   submitLabel: string;
+  errors: FormErrors | null;
 }) => {
-  const { bill, action, submitLabel } = props;
+  const { bill, action, submitLabel, errors } = props;
 
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('${action}')"
       data-signals="${JSON.stringify({
@@ -237,6 +246,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Bill Name",
           htmlFor: "name",
+          error: errors?.fieldErrors?.name?.[0],
           children: html`
             <input
               type="text"
@@ -251,6 +261,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Amount",
           htmlFor: "amount",
+          error: errors?.fieldErrors?.amount?.[0],
           children: html`
             <input
               type="number"
@@ -267,6 +278,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Frequency",
           htmlFor: "frequency",
+          error: errors?.fieldErrors?.frequency?.[0],
           children: html`
             <select
               id="frequency"
@@ -285,6 +297,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Due Date",
           htmlFor: "dueDate",
+          error: errors?.fieldErrors?.dueDate?.[0],
           children: html`
             <input
               type="date"
@@ -299,6 +312,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Category",
           htmlFor: "category",
+          error: errors?.fieldErrors?.category?.[0],
           children: html`
             <select
               id="category"
@@ -318,6 +332,7 @@ const BillForm = (props: {
         ${FormField({
           label: "Reminder Days",
           htmlFor: "reminderDays",
+          error: errors?.fieldErrors?.reminderDays?.[0],
           children: html`
             <input
               type="number"
@@ -335,6 +350,7 @@ const BillForm = (props: {
           ${FormField({
             label: "Notes",
             htmlFor: "notes",
+            error: errors?.fieldErrors?.notes?.[0],
             children: html`
               <textarea
                 id="notes"
@@ -357,8 +373,17 @@ const BillForm = (props: {
 };
 
 // Renders the payment form
-const PaymentForm = (bill: Bill) => {
+const PaymentForm = ({
+  bill,
+  errors,
+}: {
+  bill: Bill;
+  errors: FormErrors | null;
+}) => {
   return html`
+    ${errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""}
     <form
       data-on:submit="@post('/app/bills/${bill.id}/pay')"
       data-signals="${JSON.stringify({
@@ -370,6 +395,7 @@ const PaymentForm = (bill: Bill) => {
         ${FormField({
           label: "Amount Paid",
           htmlFor: "paymentAmount",
+          error: errors?.fieldErrors?.amount?.[0],
           children: html`
             <input
               type="number"
@@ -386,6 +412,7 @@ const PaymentForm = (bill: Bill) => {
         ${FormField({
           label: "Notes (optional)",
           htmlFor: "paymentNotes",
+          error: errors?.fieldErrors?.notes?.[0],
           children: html`
             <input
               type="text"
@@ -483,6 +510,7 @@ type BillsPageState = {
 type BillDetailPageState = {
   bill: Bill;
   payments: BillPayment[];
+  formErrors: FormErrors | null;
 };
 
 // Bills list content renderer
@@ -538,6 +566,54 @@ billsRouter.get(
   }),
 );
 
+// Form state type for create/edit pages
+type BillFormPageState = {
+  bill?: Bill;
+  action: string;
+  submitLabel: string;
+  formErrors: FormErrors | null;
+};
+
+// Bill form content renderer (used by SSE for create/edit pages)
+const renderBillFormContent = (state: BillFormPageState) => html`
+  <div id="bill-form-content">
+    ${Card({
+      children: html`
+        <div class="card-body">
+          ${BillForm({
+            bill: state.bill,
+            action: state.action,
+            submitLabel: state.submitLabel,
+            errors: state.formErrors,
+          })}
+        </div>
+      `,
+    })}
+  </div>
+`;
+
+// Bill form resource (shared by create and edit pages)
+const billFormResource = createFormResource({
+  path: "/app/bills/form/sse",
+  schema: billFormSchema,
+  command: createBillCommand,
+  eventTypes: ["bill.*"],
+  successRedirect: "/app/bills",
+  loadState: async (_user, c, cid) => {
+    const editId = c.req.query("editId");
+    const bill = editId ? await getBill(editId) : undefined;
+    return {
+      bill: bill || undefined,
+      action: editId ? `/app/bills/${editId}` : "/app/bills",
+      submitLabel: editId ? "Save Changes" : "Add Bill",
+      formErrors: formErrorStore.getErrors(cid),
+    };
+  },
+  render: renderBillFormContent,
+});
+
+billsRouter.post("/form/sse", billFormResource.sseHandler);
+
 // New bill page
 billsRouter.get("/new", async (c) => {
   const user = c.get("user")!;
@@ -557,35 +633,20 @@ billsRouter.get("/new", async (c) => {
           title: "Add New Bill",
           description: "Add a recurring bill or renewal to track",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${BillForm({
-                action: "/app/bills",
-                submitLabel: "Add Bill",
-              })}
-            </div>
-          `,
-        })}
+        ${billFormResource.container(
+          renderBillFormContent({
+            action: "/app/bills",
+            submitLabel: "Add Bill",
+            formErrors: null,
+          }),
+        )}
       `,
     }),
   );
 });
 
 // Create bill
-billsRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = billFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createBillCommand, user, result.data);
-
-  return c.redirect("/app/bills");
-});
+billsRouter.post("/", billFormResource.postHandler);
 
 // Bill detail content renderer
 const renderBillDetailContent = (state: BillDetailPageState) => {
@@ -679,7 +740,10 @@ const renderBillDetailContent = (state: BillDetailPageState) => {
                 Mark this bill as paid. The due date will automatically advance
                 based on the frequency.
               </p>
-              ${PaymentForm(bill)}
+              ${PaymentForm({
+                bill,
+                errors: state.formErrors,
+              })}
             </div>
           </div>
         </div>
@@ -689,6 +753,28 @@ const renderBillDetailContent = (state: BillDetailPageState) => {
     </div>
   `;
 };
+
+// Bill detail form resource (detail page with payment form)
+const billDetailResource = createFormResource({
+  path: "",
+  schema: paymentFormSchema,
+  command: markBillPaidCommand,
+  data: (parsed, c) => ({
+    billId: c.req.param("id"),
+    amount: parsed.amount,
+    notes: parsed.notes,
+  }),
+  eventTypes: ["bill.*", "notification.*"],
+  errorRedirect: "/app/bills",
+  loadState: async (_user, c, cid) => {
+    const id = c.req.param("id");
+    const bill = await getBill(id);
+    if (!bill) throw new Error("Bill not found");
+    const payments = await getBillPayments(id);
+    return { bill, payments, formErrors: formErrorStore.getErrors(cid) };
+  },
+  render: renderBillDetailContent,
+});
 
 // Bill detail page
 billsRouter.get("/:id", async (c) => {
@@ -738,31 +824,17 @@ billsRouter.get("/:id", async (c) => {
             `,
           })}
         </div>
-        <div data-init="@get('/app/bills/${id}/sse')">
-          ${renderBillDetailContent({ bill, payments })}
-        </div>
+        ${billDetailResource.container(
+          renderBillDetailContent({ bill, payments, formErrors: null }),
+          `/app/bills/${id}/sse`,
+        )}
       `,
     }),
   );
 });
 
 // Bill detail SSE endpoint
-billsRouter.get("/:id/sse", async (c) => {
-  const id = c.req.param("id");
-
-  return createSSEResource({
-    loadState: async (): Promise<BillDetailPageState> => {
-      const bill = await getBill(id);
-      if (!bill) {
-        throw new Error("Bill not found");
-      }
-      const payments = await getBillPayments(id);
-      return { bill, payments };
-    },
-    render: renderBillDetailContent,
-    eventTypes: ["bill.*"],
-  })(c);
-});
+billsRouter.post("/:id/sse", billDetailResource.sseHandler);
 
 // Edit bill page
 billsRouter.get("/:id/edit", async (c) => {
@@ -790,60 +862,32 @@ billsRouter.get("/:id/edit", async (c) => {
           title: `Edit ${bill.name}`,
           description: "Update bill details",
         })}
-        ${Card({
-          children: html`
-            <div class="card-body">
-              ${BillForm({
-                bill,
-                action: `/app/bills/${id}`,
-                submitLabel: "Save Changes",
-              })}
-            </div>
-          `,
-        })}
+        ${billFormResource.container(
+          renderBillFormContent({
+            bill,
+            action: `/app/bills/${id}`,
+            submitLabel: "Save Changes",
+            formErrors: null,
+          }),
+          `/app/bills/form/sse?editId=${id}`,
+        )}
       `,
     }),
   );
 });
 
 // Update bill
-billsRouter.post("/:id", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = billFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(updateBillCommand, user, {
-    id,
-    ...result.data,
-  });
-
-  return c.redirect(`/app/bills/${id}`);
-});
+billsRouter.post(
+  "/:id",
+  handleFormPost({
+    schema: billFormSchema,
+    command: updateBillCommand,
+    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+  }),
+);
 
 // Mark bill as paid
-billsRouter.post("/:id/pay", async (c) => {
-  const user = c.get("user")!;
-  const id = c.req.param("id");
-  const body = await c.req.json();
-
-  const result = paymentFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(markBillPaidCommand, user, {
-    billId: id,
-    amount: result.data.amount,
-    notes: result.data.notes,
-  });
-
-  return c.body(null, 204);
-});
+billsRouter.post("/:id/pay", billDetailResource.postHandler);
 
 // Delete bill
 billsRouter.post("/:id/delete", async (c) => {
@@ -852,5 +896,5 @@ billsRouter.post("/:id/delete", async (c) => {
 
   commandStore.enqueue(deleteBillCommand, user, { id });
 
-  return c.redirect("/app/bills");
+  return c.body(null, 204);
 });

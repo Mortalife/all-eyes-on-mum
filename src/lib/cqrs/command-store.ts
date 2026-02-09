@@ -1,3 +1,4 @@
+import { createNotification } from "../notifications/index.ts";
 import type { User } from "../../types/user.ts";
 import type { CommandDefinition } from "./define.ts";
 import { eventBus } from "./event-bus.ts";
@@ -70,6 +71,22 @@ class CommandStore {
       }
     } catch (error) {
       console.error(`Command ${command.definition.type} failed:`, error);
+
+      // Create an error notification so the user gets feedback
+      try {
+        await createNotification({
+          userId: command.user.id,
+          type: "error",
+          title: "Action failed",
+          message: "Something went wrong. Please try again.",
+        });
+        eventBus.publishToUser(command.user.id, {
+          type: "notification.updated",
+          data: { commandType: command.definition.type },
+        });
+      } catch (notifyError) {
+        console.error("Failed to create error notification:", notifyError);
+      }
     } finally {
       this.processing = false;
     }

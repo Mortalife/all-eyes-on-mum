@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { z } from "zod";
 import { findUserById } from "../../lib/auth/index.ts";
-import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
+import {
+  commandStore,
+  createFormResource,
+  formErrorStore,
+} from "../../lib/cqrs/index.ts";
+import type { FormErrors } from "../../lib/cqrs/form-errors.ts";
 import {
   createObservationCommand,
   deleteObservationCommand,
@@ -174,7 +179,7 @@ const getTodayDate = (): string => {
 };
 
 // Renders the add observation form
-const AddObservationForm = () => html`
+const AddObservationForm = ({ errors }: { errors: FormErrors | null }) => html`
   <div class="mb-6">
     ${Card({
       children: html`
@@ -203,6 +208,11 @@ const AddObservationForm = () => html`
             </svg>
             Add Observation
           </h2>
+          ${errors?.formErrors?.length
+            ? html`<div class="alert alert-error mb-4">
+                ${errors.formErrors[0]}
+              </div>`
+            : ""}
           <form
             data-on:submit="@post('/app/observations')"
             data-signals="${JSON.stringify({
@@ -215,6 +225,7 @@ const AddObservationForm = () => html`
               ${FormField({
                 label: "What did you notice?",
                 htmlFor: "content",
+                error: errors?.fieldErrors?.content?.[0],
                 children: html`
                   <textarea
                     id="content"
@@ -230,6 +241,7 @@ const AddObservationForm = () => html`
                 ${FormField({
                   label: "Category",
                   htmlFor: "category",
+                  error: errors?.fieldErrors?.category?.[0],
                   children: html`
                     <select
                       id="category"
@@ -252,6 +264,7 @@ const AddObservationForm = () => html`
                 ${FormField({
                   label: "When did you notice this?",
                   htmlFor: "observedAt",
+                  error: errors?.fieldErrors?.observedAt?.[0],
                   children: html`
                     <input
                       type="date"
@@ -474,6 +487,7 @@ type ObservationsPageState = {
   observations: ObservationWithAuthor[];
   activeCategory: ObservationCategory | null;
   searchQuery: string;
+  formErrors: FormErrors | null;
 };
 
 // Observations content renderer
@@ -482,7 +496,9 @@ const renderObservationsContent = (state: ObservationsPageState) => html`
     id="observations-content"
     data-signals="${JSON.stringify({ searchQuery: state.searchQuery })}"
   >
-    ${AddObservationForm()}
+    ${AddObservationForm({
+      errors: state.formErrors,
+    })}
     ${Card({
       children: html`
         <div class="card-body">
@@ -527,6 +543,7 @@ const renderObservationsContent = (state: ObservationsPageState) => html`
 const loadObservationsPageState = async (
   category: ObservationCategory | null,
   query: string,
+  connectionId: string,
 ): Promise<ObservationsPageState> => {
   let observations: Observation[];
 
@@ -545,6 +562,7 @@ const loadObservationsPageState = async (
     observations: observationsWithAuthors,
     activeCategory: category,
     searchQuery: query,
+    formErrors: formErrorStore.getErrors(connectionId),
   };
 };
 
@@ -560,16 +578,34 @@ const parseQueryParams = (c: {
   };
 };
 
+// Form resource for observation creation + SSE
+const observationsForm = createFormResource({
+  path: "/app/observations/sse",
+  schema: observationFormSchema,
+  command: createObservationCommand,
+  eventTypes: ["observation.*", "notification.*"],
+  loadState: (_user, c, cid) => {
+    const { category, search } = parseQueryParams(c);
+    return loadObservationsPageState(category, search, cid);
+  },
+  render: renderObservationsContent,
+});
+
 // Observations list page
 observationsRouter.get("/", async (c) => {
   const user = c.get("user")!;
   const { category, search } = parseQueryParams(c);
 
   const [state, notifications, unreadCount] = await Promise.all([
-    loadObservationsPageState(category, search),
+    loadObservationsPageState(category, search, ""),
     getNotifications(user.id, 5),
     getUnreadCount(user.id),
   ]);
+
+  // Build SSE URL query params
+  const sseParams = new URLSearchParams();
+  if (category) sseParams.set("category", category);
+  if (search) sseParams.set("search", search);
 
   return c.html(
     AppLayout({
@@ -583,51 +619,20 @@ observationsRouter.get("/", async (c) => {
           description:
             "Record things you notice during visits - patterns emerge over time",
         })}
-        <div
-          data-init="@get('/app/observations/sse${category
-            ? `?category=${category}`
-            : ""}${search
-            ? `${category ? "&" : "?"}search=${encodeURIComponent(search)}`
-            : ""}')"
-        >
-          ${renderObservationsContent(state)}
-        </div>
+        ${observationsForm.container(
+          renderObservationsContent(state),
+          `/app/observations/sse?${sseParams.toString()}`,
+        )}
       `,
     }),
   );
 });
 
 // Observations SSE endpoint
-observationsRouter.get(
-  "/sse",
-  createSSEResource({
-    loadState: (_user, c) => {
-      const { category, search } = parseQueryParams(c);
-      return loadObservationsPageState(category, search);
-    },
-    render: renderObservationsContent,
-    eventTypes: ["observation.*"],
-  }),
-);
+observationsRouter.post("/sse", observationsForm.sseHandler);
 
 // Create observation
-observationsRouter.post("/", async (c) => {
-  const user = c.get("user")!;
-  const body = await c.req.json();
-
-  const result = observationFormSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.flatten() }, 400);
-  }
-
-  commandStore.enqueue(createObservationCommand, user, {
-    content: result.data.content,
-    category: result.data.category,
-    observedAt: result.data.observedAt,
-  });
-
-  return c.body(null, 204);
-});
+observationsRouter.post("/", observationsForm.postHandler);
 
 // Search observations (updates URL with search query)
 observationsRouter.post("/search", async (c) => {
