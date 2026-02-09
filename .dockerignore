@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-public/
+.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+.DS_Store
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+CLAUDE.md
+*.md
+.vscode/
+.idea/

@@ -1,0 +1,16 @@
+dbs:
+  - path: /data/app.sqlite
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_REPLICA_BUCKET}
+        path: app.sqlite
+        endpoint: ${LITESTREAM_REPLICA_ENDPOINT}
+        force-path-style: true
+
+  - path: /data/sidequest.sqlite
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_REPLICA_BUCKET}
+        path: sidequest.sqlite
+        endpoint: ${LITESTREAM_REPLICA_ENDPOINT}
+        force-path-style: true

@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - data:/data
+    environment:
+      # App
+      PORT: 3000
+      BASE_URL: https://example.com
+      NODE_ENV: production
+      DATABASE_PATH: /data/
+      ADMIN_EMAIL: admin@example.com
+
+      # Litestream S3 replication
+      LITESTREAM_REPLICA_BUCKET: my-backup-bucket
+      LITESTREAM_REPLICA_ENDPOINT: https://s3.amazonaws.com
+      AWS_ACCESS_KEY_ID: your-access-key-id
+      AWS_SECRET_ACCESS_KEY: your-secret-access-key
+    restart: unless-stopped
+
+volumes:
+  data:
