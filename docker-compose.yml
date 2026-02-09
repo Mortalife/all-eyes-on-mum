@@ -14,11 +14,52 @@ services:
       ADMIN_EMAIL: admin@example.com
 
       # Litestream S3 replication
-      LITESTREAM_REPLICA_BUCKET: my-backup-bucket
-      LITESTREAM_REPLICA_ENDPOINT: https://s3.amazonaws.com
-      AWS_ACCESS_KEY_ID: your-access-key-id
-      AWS_SECRET_ACCESS_KEY: your-secret-access-key
+      LITESTREAM_REPLICA_BUCKET: backups
+      LITESTREAM_REPLICA_ENDPOINT: http://rustfs:9000
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rustfs-init:
+    image: minio/mc:latest
+    entrypoint: >
+      sh -c "
+      mc alias set rustfs http://rustfs:9000 rustfsadmin rustfsadmin &&
+      mc mb --ignore-existing rustfs/backups
+      "
+    depends_on:
+      rustfs:
+        condition: service_healthy
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs-data:/data
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_CONSOLE_ENABLE: "true"
+    command: --access-key rustfsadmin --secret-key rustfsadmin --console-enable /data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
 
 volumes:
   data:
+  rustfs-data:

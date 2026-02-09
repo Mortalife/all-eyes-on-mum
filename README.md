@@ -64,10 +64,59 @@ pnpm db:migrate
 pnpm dev
 ```
 
+## Getting Started with Docker Compose
+
+Docker Compose runs the app with a local S3-compatible server ([RustFS](https://rustfs.com)) for SQLite backups via [Litestream](https://litestream.io).
+
+### 1. Configure environment
+
+Edit `docker-compose.yml` and set `ADMIN_EMAIL` to your email address and `BASE_URL` to your domain.
+
+### 2. Start the stack
+
+```bash
+docker compose up -d
+```
+
+This starts three services in order:
+
+1. **rustfs** - S3-compatible object storage for database backups
+2. **rustfs-init** - Creates the `backups` bucket, then exits
+3. **app** - Builds and starts the application with Litestream replication
+
+### 3. Verify
+
+```bash
+# Check all services started
+docker compose ps
+
+# View app logs
+docker compose logs app -f
+```
+
+The app is available at `http://localhost:3000`.
+
+The RustFS console is available at `http://localhost:9001` (login: `rustfsadmin` / `rustfsadmin`) to inspect backup data.
+
+### Configuration
+
+| Variable                      | Service | Description                               |
+| ----------------------------- | ------- | ----------------------------------------- |
+| `PORT`                        | app     | HTTP server port (default `3000`)         |
+| `BASE_URL`                    | app     | Public-facing URL                         |
+| `ADMIN_EMAIL`                 | app     | Admin email address (required)            |
+| `DATABASE_PATH`               | app     | SQLite directory (default `/data/`)       |
+| `LITESTREAM_REPLICA_BUCKET`   | app     | S3 bucket for backups (default `backups`) |
+| `LITESTREAM_REPLICA_ENDPOINT` | app     | S3 endpoint URL                           |
+| `AWS_ACCESS_KEY_ID`           | app     | S3 access key                             |
+| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |
+| `RUSTFS_ACCESS_KEY`           | rustfs  | RustFS admin access key                   |
+| `RUSTFS_SECRET_KEY`           | rustfs  | RustFS admin secret key                   |
+
 ## Access
 
 This is family-only software. The configured admin email can register first, then creates accounts for other family members. No public registration.
 
 ## Privacy
 
-All data stays on your own server. No third-party analytics, no data sharing. This is private family information.
+All data stays on your own server. No third-party analytics, no data sharing.
