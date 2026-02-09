@@ -61,7 +61,7 @@ export const sessionMiddleware: MiddlewareHandler<HonoContext> = async (
   const now = Date.now();
   const daysUntilExpiry = (expiresAt - now) / (24 * 60 * 60 * 1000);
 
-  if (daysUntilExpiry < 29) {
+  if (daysUntilExpiry < 15) {
     // Refresh cookie and extend session
     await extendSession(result.session.token);
     setSessionCookie(c, token);
