@@ -11,6 +11,9 @@ import type { HonoContext } from "./types/hono.ts";
 
 export const app = new Hono<HonoContext>();
 
+// Healthcheck — before any middleware so it's fast and has no side effects
+app.get("/health", (c) => c.json({ status: "ok" }));
+
 // CSRF protection
 app.use(csrf());
 
