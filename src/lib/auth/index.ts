@@ -22,7 +22,10 @@ export {
   findUserByEmail,
   findUserById,
   getAllUsers,
+  getAllUsersWithStatus,
   isAdminEmail,
   isRegistrationOpen,
+  setUserPassword,
   verifyUserCredentials,
 } from "./user.ts";
+export type { UserWithStatus } from "./user.ts";
