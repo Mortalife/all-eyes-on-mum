@@ -1,5 +1,6 @@
 import type { AppointmentType } from "../../types/appointment.ts";
 import { defineCommand } from "../cqrs/index.ts";
+import { createNotification } from "../notifications/index.ts";
 import {
   createAppointment,
   deleteAppointment,
@@ -37,6 +38,12 @@ export const createAppointmentCommand = defineCommand({
   emits: "appointment.created",
   handler: async (user, data: CreateAppointmentInput) => {
     const appointment = await createAppointment(data, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Appointment added",
+      message: `${data.title} has been scheduled.`,
+    });
     return { success: true, appointment };
   },
 });
@@ -45,9 +52,15 @@ export const createAppointmentCommand = defineCommand({
 export const updateAppointmentCommand = defineCommand({
   type: "appointment.update",
   emits: "appointment.updated",
-  handler: async (_user, data: UpdateAppointmentInput) => {
+  handler: async (user, data: UpdateAppointmentInput) => {
     const { id, ...updateData } = data;
     const appointment = await updateAppointment(id, updateData);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Appointment updated",
+      message: `${updateData.title || "Appointment"} has been updated.`,
+    });
     return { success: !!appointment, appointment };
   },
 });
@@ -56,8 +69,14 @@ export const updateAppointmentCommand = defineCommand({
 export const deleteAppointmentCommand = defineCommand({
   type: "appointment.delete",
   emits: "appointment.deleted",
-  handler: async (_user, data: DeleteAppointmentInput) => {
+  handler: async (user, data: DeleteAppointmentInput) => {
     const success = await deleteAppointment(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Appointment deleted",
+      message: "The appointment has been removed.",
+    });
     return { success, id: data.id };
   },
 });

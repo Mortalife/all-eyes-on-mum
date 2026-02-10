@@ -1,5 +1,6 @@
 import type { ContractCategory, PaymentMethod } from "../../types/contract.ts";
 import { defineCommand } from "../cqrs/index.ts";
+import { createNotification } from "../notifications/index.ts";
 import { createContract, deleteContract, updateContract } from "./index.ts";
 
 type CreateContractInput = {
@@ -37,6 +38,12 @@ export const createContractCommand = defineCommand({
   emits: "contract.created",
   handler: async (user, data: CreateContractInput) => {
     const contract = await createContract(data, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Contract added",
+      message: `${data.name} has been added.`,
+    });
     return { success: true, contract };
   },
 });
@@ -45,9 +52,15 @@ export const createContractCommand = defineCommand({
 export const updateContractCommand = defineCommand({
   type: "contract.update",
   emits: "contract.updated",
-  handler: async (_user, data: UpdateContractInput) => {
+  handler: async (user, data: UpdateContractInput) => {
     const { id, ...updateData } = data;
     const contract = await updateContract(id, updateData);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Contract updated",
+      message: `${updateData.name || "Contract"} has been updated.`,
+    });
     return { success: !!contract, contract };
   },
 });
@@ -56,8 +69,14 @@ export const updateContractCommand = defineCommand({
 export const deleteContractCommand = defineCommand({
   type: "contract.delete",
   emits: "contract.deleted",
-  handler: async (_user, data: DeleteContractInput) => {
+  handler: async (user, data: DeleteContractInput) => {
     const success = await deleteContract(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Contract deleted",
+      message: "The contract has been removed.",
+    });
     return { success, id: data.id };
   },
 });

@@ -1,4 +1,5 @@
 import { defineCommand } from "../cqrs/index.ts";
+import { createNotification } from "../notifications/index.ts";
 import { createNote, deleteNote, resolveNote, unresolveNote } from "./index.ts";
 
 type CreateNoteInput = {
@@ -23,6 +24,12 @@ export const createNoteCommand = defineCommand({
   emits: "note.created",
   handler: async (user, data: CreateNoteInput) => {
     const note = await createNote(data.content, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Note added",
+      message: "A new note has been created.",
+    });
     return { success: true, note };
   },
 });
@@ -33,6 +40,12 @@ export const resolveNoteCommand = defineCommand({
   emits: "note.resolved",
   handler: async (user, data: ResolveNoteInput) => {
     const note = await resolveNote(data.id, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Note resolved",
+      message: "The note has been marked as resolved.",
+    });
     return { success: !!note, note };
   },
 });
@@ -41,8 +54,14 @@ export const resolveNoteCommand = defineCommand({
 export const unresolveNoteCommand = defineCommand({
   type: "note.unresolve",
   emits: "note.unresolved",
-  handler: async (_user, data: UnresolveNoteInput) => {
+  handler: async (user, data: UnresolveNoteInput) => {
     const note = await unresolveNote(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Note reopened",
+      message: "The note has been marked as unresolved.",
+    });
     return { success: !!note, note };
   },
 });
@@ -51,8 +70,14 @@ export const unresolveNoteCommand = defineCommand({
 export const deleteNoteCommand = defineCommand({
   type: "note.delete",
   emits: "note.deleted",
-  handler: async (_user, data: DeleteNoteInput) => {
+  handler: async (user, data: DeleteNoteInput) => {
     const success = await deleteNote(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Note deleted",
+      message: "The note has been removed.",
+    });
     return { success, id: data.id };
   },
 });

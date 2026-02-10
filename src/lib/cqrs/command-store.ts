@@ -62,11 +62,20 @@ class CommandStore {
         command.data,
       );
 
-      // Emit event on success
+      // Emit the command's own event
       if (command.definition.emits) {
         eventBus.publishToUser(command.user.id, {
           type: command.definition.emits,
           data: result,
+        });
+      }
+
+      // Emit notification event so the bell SSE updates.
+      // Skip if the command already emits a notification event.
+      if (!command.definition.emits.startsWith("notification.")) {
+        eventBus.publishToUser(command.user.id, {
+          type: "notification.updated",
+          data: { commandType: command.definition.type },
         });
       }
     } catch (error) {

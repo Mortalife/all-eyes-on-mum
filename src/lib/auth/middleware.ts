@@ -3,6 +3,8 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { HonoContext } from "../../types/hono.ts";
 import { env } from "../../env.ts";
 import { validateSessionToken, extendSession } from "./session.ts";
+import { isDatastarSSERequest, redirectFragmentEvent } from "../datastar.ts";
+import { stream } from "hono/streaming";
 
 const SESSION_COOKIE_NAME = "session";
 
@@ -75,6 +77,11 @@ export const requireAuth: MiddlewareHandler<HonoContext> = async (c, next) => {
   const user = c.get("user");
 
   if (!user) {
+    if (isDatastarSSERequest(c.req)) {
+      return stream(c, async (stream) => {
+        stream.write(redirectFragmentEvent("/auth/login"));
+      });
+    }
     return c.redirect("/auth/login");
   }
 

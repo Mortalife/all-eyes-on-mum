@@ -9,6 +9,7 @@ import { commandStore } from "./command-store.ts";
 import type { CommandDefinition } from "./define.ts";
 import { eventBus } from "./event-bus.ts";
 import { formErrorStore } from "./form-errors.ts";
+import { stream } from "hono/streaming";
 
 type FormResourceOptions<TSchema extends z.ZodType, TState, TData> = {
   path: string;
@@ -82,7 +83,9 @@ export const createFormResource = <
   const sseHandler = async (c: Context<HonoContext>) => {
     const user = c.get("user");
     if (!user) {
-      return c.text("Unauthorized", 401);
+      return stream(c, async (stream) => {
+        stream.write(redirectFragmentEvent("/auth/login"));
+      });
     }
 
     const body = await c.req.json();

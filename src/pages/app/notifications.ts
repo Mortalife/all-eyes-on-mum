@@ -14,7 +14,7 @@ import {
 import type { Notification } from "../../types/notification.ts";
 import type { HonoContext } from "../../types/hono.ts";
 import { Button, Card, PageHeader } from "../../ui/index.ts";
-import { AppLayout } from "../../ui/layouts/index.ts";
+import { AppLayout, NotificationBell } from "../../ui/layouts/index.ts";
 
 export const notificationsRouter = new Hono<HonoContext>();
 
@@ -277,6 +277,22 @@ notificationsRouter.get("/", async (c) => {
     }),
   );
 });
+
+// SSE endpoint for the notification bell in the header (global, all pages)
+notificationsRouter.get(
+  "/bell",
+  createSSEResource({
+    loadState: async (user) => {
+      const [notifications, unreadCount] = await Promise.all([
+        getNotifications(user.id, 5),
+        getUnreadCount(user.id),
+      ]);
+      return { notifications, unreadCount };
+    },
+    render: (state) => NotificationBell(state.notifications, state.unreadCount),
+    eventTypes: ["notification.*"],
+  }),
+);
 
 // SSE endpoint for real-time notification updates
 notificationsRouter.get(

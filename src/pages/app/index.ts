@@ -32,17 +32,12 @@ import { notesRouter } from "./notes.ts";
 import { notificationsRouter } from "./notifications.ts";
 import { observationsRouter } from "./observations.ts";
 import { remindersRouter } from "./reminders.ts";
+import { requireAuth } from "../../lib/auth/middleware.ts";
 
 export const appRouter = new Hono<HonoContext>();
 
 // Auth guard middleware
-appRouter.use("*", async (c, next) => {
-  const user = c.get("user");
-  if (!user) {
-    return c.redirect("/");
-  }
-  await next();
-});
+appRouter.use("*", requireAuth);
 
 // Mount notifications router
 appRouter.route("/notifications", notificationsRouter);

@@ -1,9 +1,14 @@
+import type { HonoRequest } from "hono";
 import { raw, type HtmlEscapedString } from "hono/utils/html";
 
 // Checks if request is a Datastar SSE request
-export const isDatastarSSERequest = (req: Request): boolean => {
-  const accept = req.headers.get("accept") || "";
-  return accept.includes("text/event-stream");
+export const isDatastarSSERequest = (req: HonoRequest) => {
+  const accept = req.header("Accept")?.split(", ");
+  const datastar = req.header("Datastar-Request");
+
+  return (
+    datastar === "true" || accept?.some((type) => type === "text/event-stream")
+  );
 };
 
 // Creates a patch element SSE event

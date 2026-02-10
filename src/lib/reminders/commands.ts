@@ -3,6 +3,7 @@ import type {
   ReminderFrequency,
 } from "../../types/reminder.ts";
 import { defineCommand } from "../cqrs/index.ts";
+import { createNotification } from "../notifications/index.ts";
 import {
   createReminder,
   deleteReminder,
@@ -46,6 +47,12 @@ export const createReminderCommand = defineCommand({
   emits: "reminder.created",
   handler: async (user, data: CreateReminderInput) => {
     const reminder = await createReminder(data, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Reminder created",
+      message: `${data.title} has been added.`,
+    });
     return { success: true, reminder };
   },
 });
@@ -54,14 +61,21 @@ export const createReminderCommand = defineCommand({
 export const updateReminderCommand = defineCommand({
   type: "reminder.update",
   emits: "reminder.updated",
-  handler: async (_user, data: UpdateReminderInput) => {
+  handler: async (user, data: UpdateReminderInput) => {
     const { id, ...updateData } = data;
     const reminder = await updateReminder(id, updateData);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Reminder updated",
+      message: `${updateData.title || "Reminder"} has been updated.`,
+    });
     return { success: !!reminder, reminder };
   },
 });
 
-// Triggers a reminder (marks as done and advances next due)
+// Triggers a reminder (marks as done and advances next due).
+// Note: triggerReminder() already creates its own notification internally.
 export const triggerReminderCommand = defineCommand({
   type: "reminder.trigger",
   emits: "reminder.triggered",
@@ -75,8 +89,14 @@ export const triggerReminderCommand = defineCommand({
 export const pauseReminderCommand = defineCommand({
   type: "reminder.pause",
   emits: "reminder.paused",
-  handler: async (_user, data: { id: string }) => {
+  handler: async (user, data: { id: string }) => {
     const reminder = await pauseReminder(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Reminder paused",
+      message: `${reminder?.title || "Reminder"} has been paused.`,
+    });
     return { success: !!reminder, reminder };
   },
 });
@@ -85,8 +105,14 @@ export const pauseReminderCommand = defineCommand({
 export const resumeReminderCommand = defineCommand({
   type: "reminder.resume",
   emits: "reminder.resumed",
-  handler: async (_user, data: { id: string }) => {
+  handler: async (user, data: { id: string }) => {
     const reminder = await resumeReminder(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Reminder resumed",
+      message: `${reminder?.title || "Reminder"} has been resumed.`,
+    });
     return { success: !!reminder, reminder };
   },
 });
@@ -95,8 +121,14 @@ export const resumeReminderCommand = defineCommand({
 export const deleteReminderCommand = defineCommand({
   type: "reminder.delete",
   emits: "reminder.deleted",
-  handler: async (_user, data: DeleteReminderInput) => {
+  handler: async (user, data: DeleteReminderInput) => {
     const success = await deleteReminder(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Reminder deleted",
+      message: "The reminder has been removed.",
+    });
     return { success, id: data.id };
   },
 });

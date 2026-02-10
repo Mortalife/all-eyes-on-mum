@@ -43,6 +43,13 @@ export const regenerateInviteCommand = defineCommand({
 
     inviteUrlStore.set(user.id, { userName: data.userName, inviteUrl });
 
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Invite link regenerated",
+      message: `A new invite link has been generated for ${data.userName}.`,
+    });
+
     return { success: true, inviteUrl };
   },
 });

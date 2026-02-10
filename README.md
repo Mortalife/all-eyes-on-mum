@@ -108,10 +108,9 @@ The RustFS console is available at `http://localhost:9001` (login: `rustfsadmin`
 | `DATABASE_PATH`               | app     | SQLite directory (default `/data/`)       |
 | `LITESTREAM_REPLICA_BUCKET`   | app     | S3 bucket for backups (default `backups`) |
 | `LITESTREAM_REPLICA_ENDPOINT` | app     | S3 endpoint URL                           |
+| `LITESTREAM_REPLICA_REGION`   | app     | S3 region                                 |
 | `AWS_ACCESS_KEY_ID`           | app     | S3 access key                             |
-| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |
-| `RUSTFS_ACCESS_KEY`           | rustfs  | RustFS admin access key                   |
-| `RUSTFS_SECRET_KEY`           | rustfs  | RustFS admin secret key                   |
+| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |         |
 
 ## Access
 

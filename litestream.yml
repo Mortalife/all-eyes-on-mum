@@ -4,6 +4,7 @@ dbs:
       - type: s3
         bucket: ${LITESTREAM_REPLICA_BUCKET}
         path: app.sqlite
+        region: ${LITESTREAM_REPLICA_REGION}
         endpoint: ${LITESTREAM_REPLICA_ENDPOINT}
         force-path-style: true
 
@@ -12,5 +13,6 @@ dbs:
       - type: s3
         bucket: ${LITESTREAM_REPLICA_BUCKET}
         path: sidequest.sqlite
+        region: ${LITESTREAM_REPLICA_REGION}
         endpoint: ${LITESTREAM_REPLICA_ENDPOINT}
         force-path-style: true

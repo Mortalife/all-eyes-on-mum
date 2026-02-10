@@ -1,5 +1,6 @@
 import type { HealthNoteCategory } from "../../types/health-note.ts";
 import { defineCommand } from "../cqrs/index.ts";
+import { createNotification } from "../notifications/index.ts";
 import {
   createHealthNote,
   deleteHealthNote,
@@ -31,6 +32,12 @@ export const createHealthNoteCommand = defineCommand({
   emits: "healthNote.created",
   handler: async (user, data: CreateHealthNoteInput) => {
     const healthNote = await createHealthNote(data, user.id);
+    await createNotification({
+      userId: user.id,
+      type: "success",
+      title: "Health note added",
+      message: `${data.title} has been recorded.`,
+    });
     return { success: true, healthNote };
   },
 });
@@ -39,9 +46,15 @@ export const createHealthNoteCommand = defineCommand({
 export const updateHealthNoteCommand = defineCommand({
   type: "healthNote.update",
   emits: "healthNote.updated",
-  handler: async (_user, data: UpdateHealthNoteInput) => {
+  handler: async (user, data: UpdateHealthNoteInput) => {
     const { id, ...updateData } = data;
     const healthNote = await updateHealthNote(id, updateData);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Health note updated",
+      message: `${updateData.title || "Health note"} has been updated.`,
+    });
     return { success: !!healthNote, healthNote };
   },
 });
@@ -50,8 +63,14 @@ export const updateHealthNoteCommand = defineCommand({
 export const deleteHealthNoteCommand = defineCommand({
   type: "healthNote.delete",
   emits: "healthNote.deleted",
-  handler: async (_user, data: DeleteHealthNoteInput) => {
+  handler: async (user, data: DeleteHealthNoteInput) => {
     const success = await deleteHealthNote(data.id);
+    await createNotification({
+      userId: user.id,
+      type: "info",
+      title: "Health note deleted",
+      message: "The health note has been removed.",
+    });
     return { success, id: data.id };
   },
 });

@@ -129,6 +129,46 @@ const NotificationItem = (notification: Notification) => html`
   </div>
 `;
 
+// Renders the notification bell with badge and dropdown (SSE-patchable)
+export const NotificationBell = (
+  notifications: Notification[],
+  unreadCount: number,
+) => html`
+  <div id="notification-bell" class="dropdown dropdown-end">
+    <div
+      tabindex="0"
+      role="button"
+      class="btn btn-ghost btn-circle"
+      aria-label="Notifications"
+      aria-expanded="false"
+    >
+      <div class="indicator">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+        ${unreadCount > 0
+          ? html`<span class="badge badge-primary badge-xs indicator-item"
+              >${unreadCount > 99 ? "99+" : unreadCount}</span
+            >`
+          : ""}
+      </div>
+    </div>
+    ${NotificationDropdown(notifications, unreadCount)}
+  </div>
+`;
+
 // Renders the notification dropdown content
 const NotificationDropdown = (
   notifications: Notification[],
@@ -236,40 +276,9 @@ export const AppLayout = ({
               <span class="text-xl font-bold">All Eyes on Mum</span>
             </div>
             <div class="flex-none flex items-center gap-2">
-              <!-- Notification bell -->
-              <div class="dropdown dropdown-end">
-                <div
-                  tabindex="0"
-                  role="button"
-                  class="btn btn-ghost btn-circle"
-                  aria-label="Notifications"
-                  aria-expanded="false"
-                >
-                  <div class="indicator">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                      />
-                    </svg>
-                    ${unreadCount > 0
-                      ? html`<span
-                          class="badge badge-primary badge-xs indicator-item"
-                          >${unreadCount > 99 ? "99+" : unreadCount}</span
-                        >`
-                      : ""}
-                  </div>
-                </div>
-                ${NotificationDropdown(notifications, unreadCount)}
+              <!-- Notification bell (SSE-updated) -->
+              <div data-init="@get('/app/notifications/bell')">
+                ${NotificationBell(notifications, unreadCount)}
               </div>
 
               <!-- User menu -->

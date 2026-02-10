@@ -4,6 +4,7 @@ import type { HonoContext } from "../../types/hono.ts";
 import type { User } from "../../types/user.ts";
 import { patchElementEvent, redirectFragmentEvent } from "../datastar.ts";
 import { eventBus } from "./event-bus.ts";
+import { stream } from "hono/streaming";
 
 type SSEResourceOptions<TState> = {
   loadState: (user: User, c: Context<HonoContext>) => Promise<TState>;
@@ -20,7 +21,9 @@ export const createSSEResource = <TState>(
   return async (c: Context<HonoContext>) => {
     const user = c.get("user");
     if (!user) {
-      return c.text("Unauthorized", 401);
+      return stream(c, async (stream) => {
+        stream.write(redirectFragmentEvent("/auth/login"));
+      });
     }
 
     const { readable, writable } = new TransformStream();
