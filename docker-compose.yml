@@ -10,6 +10,7 @@ services:
       PORT: 3000
       BASE_URL: https://example.com
       NODE_ENV: production
+      ORIGIN_SECRET: ${ORIGIN_SECRET:?Set ORIGIN_SECRET to match the Cloudflare request header}
       DATABASE_PATH: /data/
       ADMIN_EMAIL: admin@example.com
 

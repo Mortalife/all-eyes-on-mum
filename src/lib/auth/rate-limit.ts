@@ -24,7 +24,7 @@ setInterval(() => {
 }, 60_000);
 
 // Extracts the client IP from the request (Cloudflare -> Traefik -> app)
-// CF-Connecting-IP is set by Cloudflare to the real client address and cannot be spoofed.
+// In production, requireTrustedOrigin verifies Cloudflare's shared secret first.
 const getClientIp = (c: Context): string => {
   return c.req.header("cf-connecting-ip") || "unknown";
 };

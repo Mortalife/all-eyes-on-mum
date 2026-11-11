@@ -5,6 +5,7 @@ import type {
 } from "../../types/notification.ts";
 import { generateSecureRandomString } from "../auth/crypto.ts";
 import { client } from "../db.ts";
+import { sendPushToUser } from "../push/index.ts";
 
 export { initNotificationTable } from "./schema.ts";
 
@@ -54,6 +55,15 @@ export const createNotification = async (
       data.sourceId || null,
     ],
   });
+
+  // Only system alerts (items needing attention) go to phones, not confirmations of the user's own actions
+  if (data.sourceType) {
+    await sendPushToUser(data.userId, {
+      title: data.title || "All Eyes on Mum",
+      body: data.message,
+      url: data.actionUrl || "/app/notifications",
+    });
+  }
 
   return {
     id,

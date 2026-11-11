@@ -11,6 +11,7 @@ import { initHealthNoteTables } from "./lib/health-notes/index.ts";
 import { initNoteTables } from "./lib/notes/index.ts";
 import { initNotificationTable } from "./lib/notifications/index.ts";
 import { initObservationTables } from "./lib/observations/index.ts";
+import { initPushSubscriptionTable } from "./lib/push/index.ts";
 import { initReminderTables } from "./lib/reminders/index.ts";
 import app from "./server.ts";
 
@@ -27,6 +28,10 @@ const start = async () => {
   // Initialize notification table
   await initNotificationTable();
   console.log("Notification table initialized");
+
+  // Initialize push subscription table
+  await initPushSubscriptionTable();
+  console.log("Push subscription table initialized");
 
   // Initialize bill tables (legacy, kept for migration)
   await initBillTables();

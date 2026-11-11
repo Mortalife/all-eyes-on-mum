@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
+import { z } from "zod";
 import { commandStore, createSSEResource } from "../../lib/cqrs/index.ts";
 import {
   clearAllNotificationsCommand,
@@ -11,12 +12,25 @@ import {
   getNotifications,
   getUnreadCount,
 } from "../../lib/notifications/index.ts";
+import {
+  sendTestPushCommand,
+  subscribePushCommand,
+  unsubscribePushCommand,
+} from "../../lib/push/commands.ts";
+import { IS_PUSH_CONFIGURED, VAPID_PUBLIC_KEY } from "../../lib/push/index.ts";
+import { getAssetPath } from "../../lib/vite-manifest.ts";
 import type { Notification } from "../../types/notification.ts";
 import type { HonoContext } from "../../types/hono.ts";
 import { Button, Card, PageHeader } from "../../ui/index.ts";
 import { AppLayout, NotificationBell } from "../../ui/layouts/index.ts";
 
 export const notificationsRouter = new Hono<HonoContext>();
+
+// The server sends requests to this endpoint, so only accept https push service URLs
+const pushSubscriptionSchema = z.object({
+  endpoint: z.url({ protocol: /^https$/ }),
+  keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) }),
+});
 
 // Formats a date as relative time (e.g., "2 hours ago")
 const formatTimeAgo = (dateString: string): string => {
@@ -186,6 +200,53 @@ const NotificationListItem = (notification: Notification) => html`
   </div>
 `;
 
+// Renders controls for turning phone push notifications on or off for this device
+const PushSettingsCard = () => html`
+  <script type="module" src="${getAssetPath("src/assets/push.ts")}"></script>
+  ${Card({
+    class: "mb-6",
+    children: html`
+      <div class="card-body">
+        <h2 class="card-title text-base">Phone notifications</h2>
+        <p class="text-sm text-base-content/70">
+          Get alerts for appointments, contracts and reminders on this device,
+          even when the app is closed. On iPhone, add the app to your Home
+          Screen and open it from there first.
+        </p>
+        <div class="card-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            data-on:click="window.enablePush('${VAPID_PUBLIC_KEY}')"
+          >
+            Turn on for this device
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            data-on:click="@post('/app/notifications/push/test')"
+          >
+            Send test
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            data-on:click="window.disablePush()"
+          >
+            Turn off for this device
+          </button>
+        </div>
+        <p
+          id="push-status"
+          class="text-sm text-error"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+    `,
+  })}
+`;
+
 // Page state type
 type NotificationsPageState = {
   notifications: Notification[];
@@ -282,6 +343,7 @@ notificationsRouter.get("/", async (c) => {
           title: "Notifications",
           description: "View and manage your notifications",
         })}
+        ${IS_PUSH_CONFIGURED ? PushSettingsCard() : ""}
         <div data-init="@get('/app/notifications/sse')">
           ${renderNotificationsContent({ notifications, unreadCount })}
         </div>
@@ -355,6 +417,41 @@ notificationsRouter.post("/:id/dismiss", async (c) => {
     notificationId,
     userId: user.id,
   });
+
+  return c.body(null, 204);
+});
+
+// Registers this device for push notifications
+notificationsRouter.post("/push/subscribe", async (c) => {
+  const user = c.get("user")!;
+  const parsed = pushSubscriptionSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.body(null, 400);
+
+  commandStore.enqueue(subscribePushCommand, user, {
+    subscription: parsed.data,
+  });
+
+  return c.body(null, 204);
+});
+
+// Stops push notifications for this device
+notificationsRouter.post("/push/unsubscribe", async (c) => {
+  const user = c.get("user")!;
+  const parsed = pushSubscriptionSchema
+    .pick({ endpoint: true })
+    .safeParse(await c.req.json());
+  if (!parsed.success) return c.body(null, 400);
+
+  commandStore.enqueue(unsubscribePushCommand, user, parsed.data);
+
+  return c.body(null, 204);
+});
+
+// Sends a test push notification to all of the user's devices
+notificationsRouter.post("/push/test", async (c) => {
+  const user = c.get("user")!;
+
+  commandStore.enqueue(sendTestPushCommand, user, {});
 
   return c.body(null, 204);
 });

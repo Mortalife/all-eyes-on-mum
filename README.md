@@ -100,19 +100,42 @@ The RustFS console is available at `http://localhost:9001` (login: `rustfsadmin`
 
 ### Configuration
 
-| Variable                      | Service | Description                               |
-| ----------------------------- | ------- | ----------------------------------------- |
-| `PORT`                        | app     | HTTP server port (default `3000`)         |
-| `BASE_URL`                    | app     | Public-facing URL                         |
-| `ADMIN_EMAIL`                 | app     | Admin email address (required)            |
-| `DATABASE_PATH`               | app     | SQLite directory (default `/data/`)       |
-| `LITESTREAM_REPLICA_BUCKET`   | app     | S3 bucket for backups (default `backups`) |
-| `LITESTREAM_REPLICA_ENDPOINT` | app     | S3 endpoint URL                           |
-| `LITESTREAM_REPLICA_REGION`   | app     | S3 region                                 |
-| `AWS_ACCESS_KEY_ID`           | app     | S3 access key                             |
-| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |     |
+| Variable                      | Service | Description                                                                              |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `PORT`                        | app     | HTTP server port (default `3000`)                                                        |
+| `BASE_URL`                    | app     | Public-facing URL                                                                        |
+| `ADMIN_EMAIL`                 | app     | Admin email address (required)                                                           |
+| `DATABASE_PATH`               | app     | SQLite directory (default `/data/`)                                                      |
+| `VAPID_PUBLIC_KEY`            | app     | Phone push public key (optional, generate with `pnpm exec web-push generate-vapid-keys`) |
+| `VAPID_PRIVATE_KEY`           | app     | Phone push private key (optional)                                                        |
+| `LITESTREAM_REPLICA_BUCKET`   | app     | S3 bucket for backups (default `backups`)                                                |
+| `LITESTREAM_REPLICA_ENDPOINT` | app     | S3 endpoint URL                                                                          |
+| `LITESTREAM_REPLICA_REGION`   | app     | S3 region                                                                                |
+| `AWS_ACCESS_KEY_ID`           | app     | S3 access key                                                                            |
+| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                                                                            |     |
 
 ## Access
+
+Production requires `ORIGIN_SECRET` as a runtime environment variable. Generate a
+secret with `openssl rand -hex 32`, then configure a Cloudflare Request Header
+Transform Rule matching the app's hostname to **Set static** `X-Origin-Secret` to
+that same value. Use a request header, never a response header. In Coolify, set
+`ORIGIN_SECRET` on the application and redeploy after enabling the Cloudflare rule.
+Use HTTPS from Cloudflare to Traefik. Docker Compose also reads `ORIGIN_SECRET`
+from the environment or `.env`.
+
+All application routes and assets reject missing or incorrect origin secrets with
+HTTP 403 before session handling and login rate limiting. `GET /health` stays
+public for internal health checks. Production refuses to start without a secret;
+local development can leave it empty. A valid origin secret does not replace user
+login or admin permissions. Keep the secret out of source control and logs.
+
+After deployment, check that the normal domain works and a direct-origin request
+is rejected (replace the hostname and IP):
+
+```bash
+curl -i --resolve mum.example.com:443:203.0.113.10 https://mum.example.com/auth/login
+```
 
 This is family-only software. The configured admin email can register first, then creates accounts for other family members. No public registration.
 

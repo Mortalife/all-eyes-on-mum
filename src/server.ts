@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { sessionMiddleware } from "./lib/auth/middleware.ts";
+import { requireTrustedOrigin } from "./lib/auth/origin.ts";
 import { compressionMiddleware } from "./lib/hono/index.ts";
 import { adminRouter } from "./pages/admin/index.ts";
 import { appRouter } from "./pages/app/index.ts";
@@ -13,6 +14,9 @@ export const app = new Hono<HonoContext>();
 
 // Healthcheck — before any middleware so it's fast and has no side effects
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Authenticate the proxy before serving assets, reading sessions, or rate limiting.
+app.use("*", requireTrustedOrigin);
 
 // CSRF protection
 app.use(csrf());
