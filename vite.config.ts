@@ -3,9 +3,11 @@ import { globSync } from "glob";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss({ optimize: false })],
   build: {
     outDir: "dist-public",
+    // lightningcss drops DaisyUI's @scope relative selectors (e.g. .join z-index), esbuild keeps them
+    cssMinify: "esbuild",
     manifest: true,
     rollupOptions: {
       input: Object.fromEntries(

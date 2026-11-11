@@ -7,3 +7,5 @@ dist-public/
 *.sqlite-shm
 data/
 .DS_Store
+PLAN.md
+USER-REQUESTS.md

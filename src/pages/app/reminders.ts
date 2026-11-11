@@ -120,11 +120,13 @@ const ReminderRow = (
         >
           ${reminder.title}
         </a>
-        ${reminder.description
-          ? html`<span class="text-sm text-base-content/60 block line-clamp-1"
-              >${reminder.description}</span
-            >`
-          : ""}
+        ${
+          reminder.description
+            ? html`<span class="text-sm text-base-content/60 block line-clamp-1"
+                >${reminder.description}</span
+              >`
+            : ""
+        }
       </td>
       <td>
         <span class="badge badge-outline"
@@ -133,29 +135,33 @@ const ReminderRow = (
       </td>
       <td>${formatDate(reminder.nextDue)}</td>
       <td>
-        ${linkedContract
-          ? html`<a
-              href="/app/contracts/${linkedContract.id}"
-              class="link link-hover text-sm"
-              >${linkedContract.name}</a
-            >`
-          : html`<span class="text-base-content/50">-</span>`}
+        ${
+          linkedContract
+            ? html`<a
+                href="/app/contracts/${linkedContract.id}"
+                class="link link-hover text-sm"
+                >${linkedContract.name}</a
+              >`
+            : html`<span class="text-base-content/50">-</span>`
+        }
       </td>
       <td><span class="badge ${status.class}">${status.label}</span></td>
       <td>
         <div class="flex gap-1">
-          ${reminder.isActive
-            ? html`
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-xs"
-                  data-on:click="@post('/app/reminders/${reminder.id}/trigger')"
-                  title="Mark as done"
-                >
-                  Done
-                </button>
-              `
-            : ""}
+          ${
+            reminder.isActive
+              ? html`
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    data-on:click="@post('/app/reminders/${reminder.id}/trigger')"
+                    title="Mark as done"
+                  >
+                    Done
+                  </button>
+                `
+              : ""
+          }
           <a href="/app/reminders/${reminder.id}" class="btn btn-ghost btn-xs"
             >View</a
           >
@@ -241,12 +247,16 @@ const ReminderForm = (props: {
   const { reminder, action, submitLabel, errors, prefill } = props;
 
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('${action}')"
-      data-signals="${JSON.stringify({
+      data-signals__ifmissing="${JSON.stringify({
         title: reminder?.title || prefill?.title || "",
         description: reminder?.description || "",
         frequency: reminder?.frequency || "monthly",
@@ -606,11 +616,13 @@ const renderReminderDetailContent = (state: ReminderDetailPageState) => {
               <div class="flex items-start justify-between">
                 <div>
                   <h2 class="card-title text-2xl">${reminder.title}</h2>
-                  ${reminder.description
-                    ? html`<p class="text-base-content/60 mt-1">
-                        ${reminder.description}
-                      </p>`
-                    : ""}
+                  ${
+                    reminder.description
+                      ? html`<p class="text-base-content/60 mt-1">
+                          ${reminder.description}
+                        </p>`
+                      : ""
+                  }
                 </div>
                 <span class="badge ${status.class} badge-lg"
                   >${status.label}</span
@@ -632,61 +644,69 @@ const renderReminderDetailContent = (state: ReminderDetailPageState) => {
                     ${formatDate(reminder.nextDue)}
                   </dd>
                 </div>
-                ${reminder.lastTriggered
-                  ? html`
-                      <div>
-                        <dt class="text-sm text-base-content/60">
-                          Last Completed
-                        </dt>
-                        <dd>${formatDate(reminder.lastTriggered)}</dd>
-                      </div>
-                    `
-                  : ""}
-                ${linkedContract
-                  ? html`
-                      <div>
-                        <dt class="text-sm text-base-content/60">Linked To</dt>
-                        <dd>
-                          <a
-                            href="/app/contracts/${linkedContract.id}"
-                            class="link link-primary"
-                            >${linkedContract.name}</a
-                          >
-                        </dd>
-                      </div>
-                    `
-                  : ""}
+                ${
+                  reminder.lastTriggered
+                    ? html`
+                        <div>
+                          <dt class="text-sm text-base-content/60">
+                            Last Completed
+                          </dt>
+                          <dd>${formatDate(reminder.lastTriggered)}</dd>
+                        </div>
+                      `
+                    : ""
+                }
+                ${
+                  linkedContract
+                    ? html`
+                        <div>
+                          <dt class="text-sm text-base-content/60">
+                            Linked To
+                          </dt>
+                          <dd>
+                            <a
+                              href="/app/contracts/${linkedContract.id}"
+                              class="link link-primary"
+                              >${linkedContract.name}</a
+                            >
+                          </dd>
+                        </div>
+                      `
+                    : ""
+                }
               </dl>
 
               <div class="divider"></div>
 
               <div class="flex flex-wrap gap-2">
-                ${reminder.isActive
-                  ? html`
-                      <button
-                        type="button"
-                        class="btn btn-primary"
-                        data-on:click="@post('/app/reminders/${reminder.id}/trigger')"
-                      >
-                        Mark as Done
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-ghost"
-                        data-on:click="@post('/app/reminders/${reminder.id}/pause')"
-                      >
-                        Pause
-                      </button>
-                    `
-                  : html`
-                      <button
-                        type="button"
-                        class="btn btn-primary"
-                        data-on:click="@post('/app/reminders/${reminder.id}/resume')"
-                      >
-                        Resume
-                      </button>
-                    `}
+                ${
+                  reminder.isActive
+                    ? html`
+                        <button
+                          type="button"
+                          class="btn btn-primary"
+                          data-on:click="@post('/app/reminders/${reminder.id}/trigger')"
+                        >
+                          Mark as Done
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-ghost"
+                          data-on:click="@post('/app/reminders/${reminder.id}/pause')"
+                        >
+                          Pause
+                        </button>
+                      `
+                    : html`
+                        <button
+                          type="button"
+                          class="btn btn-primary"
+                          data-on:click="@post('/app/reminders/${reminder.id}/resume')"
+                        >
+                          Resume
+                        </button>
+                      `
+                }
                 <a
                   href="/app/reminders/${reminder.id}/edit"
                   class="btn btn-ghost"
@@ -792,7 +812,7 @@ remindersRouter.get(
   "/:id/sse",
   createSSEResource({
     loadState: async (_user, c): Promise<ReminderDetailPageState> => {
-      const id = c.req.param("id");
+      const id = c.req.param("id")!;
       const reminder = await getReminder(id);
       if (!reminder) {
         throw new Error("Reminder not found");
@@ -860,7 +880,7 @@ remindersRouter.post(
   handleFormPost({
     schema: reminderFormSchema,
     command: updateReminderCommand,
-    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+    data: (parsed, c) => ({ id: c.req.param("id")!, ...parsed }),
   }),
 );
 

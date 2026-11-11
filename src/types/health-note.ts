@@ -1,8 +1,5 @@
 export type HealthNoteCategory =
-  | "medication"
-  | "gp-visit"
-  | "hospital"
-  | "general";
+  "medication" | "gp-visit" | "hospital" | "general";
 
 export type HealthNote = {
   id: string;

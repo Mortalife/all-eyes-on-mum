@@ -1,10 +1,7 @@
 export type NotificationType = "success" | "error" | "info" | "warning";
 
 export type NotificationSourceType =
-  | "bill"
-  | "appointment"
-  | "contract"
-  | "reminder";
+  "bill" | "appointment" | "contract" | "reminder";
 
 export type Notification = {
   id: string;

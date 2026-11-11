@@ -149,11 +149,13 @@ const ContractRow = (contract: Contract) => {
         >
           ${contract.name}
         </a>
-        ${contract.provider
-          ? html`<span class="text-sm text-base-content/60 block"
-              >${contract.provider}</span
-            >`
-          : ""}
+        ${
+          contract.provider
+            ? html`<span class="text-sm text-base-content/60 block"
+                >${contract.provider}</span
+              >`
+            : ""
+        }
       </td>
       <td>${formatCurrency(contract.monthlyAmount)}</td>
       <td>
@@ -164,13 +166,15 @@ const ContractRow = (contract: Contract) => {
       <td>${formatDate(contract.contractEndDate)}</td>
       <td>
         <span class="badge ${status.class}">${status.label}</span>
-        ${contract.isUsageBased
-          ? html`<span
-              class="badge badge-ghost badge-sm ml-1"
-              title="Usage-based pricing"
-              >Usage</span
-            >`
-          : ""}
+        ${
+          contract.isUsageBased
+            ? html`<span
+                class="badge badge-ghost badge-sm ml-1"
+                title="Usage-based pricing"
+                >Usage</span
+              >`
+            : ""
+        }
       </td>
       <td>
         <a href="/app/contracts/${contract.id}" class="btn btn-ghost btn-sm"
@@ -242,12 +246,16 @@ const ContractForm = (props: {
   const { contract, action, submitLabel, errors } = props;
 
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('${action}')"
-      data-signals="${JSON.stringify({
+      data-signals__ifmissing="${JSON.stringify({
         name: contract?.name || "",
         provider: contract?.provider || "",
         monthlyAmount: contract?.monthlyAmount?.toString() || "",
@@ -639,21 +647,25 @@ const renderContractDetailContent = (state: ContractDetailPageState) => {
               <div class="flex items-start justify-between">
                 <div>
                   <h2 class="card-title text-2xl">${contract.name}</h2>
-                  ${contract.provider
-                    ? html`<p class="text-base-content/60">
-                        ${contract.provider}
-                      </p>`
-                    : ""}
+                  ${
+                    contract.provider
+                      ? html`<p class="text-base-content/60">
+                          ${contract.provider}
+                        </p>`
+                      : ""
+                  }
                 </div>
                 <div class="flex gap-2">
                   <span class="badge ${status.class} badge-lg"
                     >${status.label}</span
                   >
-                  ${contract.isUsageBased
-                    ? html`<span class="badge badge-ghost badge-lg"
-                        >Usage-based</span
-                      >`
-                    : ""}
+                  ${
+                    contract.isUsageBased
+                      ? html`<span class="badge badge-ghost badge-lg"
+                          >Usage-based</span
+                        >`
+                      : ""
+                  }
                 </div>
               </div>
 
@@ -683,26 +695,32 @@ const renderContractDetailContent = (state: ContractDetailPageState) => {
                 <div>
                   <dt class="text-sm text-base-content/60">Contract Period</dt>
                   <dd>
-                    ${contract.contractStartDate
-                      ? formatDate(contract.contractStartDate)
-                      : "Not set"}
+                    ${
+                      contract.contractStartDate
+                        ? formatDate(contract.contractStartDate)
+                        : "Not set"
+                    }
                     -
-                    ${contract.contractEndDate
-                      ? formatDate(contract.contractEndDate)
-                      : "Ongoing"}
+                    ${
+                      contract.contractEndDate
+                        ? formatDate(contract.contractEndDate)
+                        : "Ongoing"
+                    }
                   </dd>
                 </div>
               </dl>
 
-              ${contract.notes
-                ? html`
-                    <div class="divider"></div>
-                    <div>
-                      <h3 class="text-sm text-base-content/60 mb-1">Notes</h3>
-                      <p class="whitespace-pre-wrap">${contract.notes}</p>
-                    </div>
-                  `
-                : ""}
+              ${
+                contract.notes
+                  ? html`
+                      <div class="divider"></div>
+                      <div>
+                        <h3 class="text-sm text-base-content/60 mb-1">Notes</h3>
+                        <p class="whitespace-pre-wrap">${contract.notes}</p>
+                      </div>
+                    `
+                  : ""
+              }
 
               <div class="divider"></div>
 
@@ -725,47 +743,51 @@ const renderContractDetailContent = (state: ContractDetailPageState) => {
         </div>
 
         <div>
-          ${contract.isUsageBased
-            ? html`
-                <div class="card bg-base-100 shadow-xl">
-                  <div class="card-body">
-                    <h3 class="card-title">Usage Tracking</h3>
-                    <p class="text-sm text-base-content/60">
-                      This contract has usage-based pricing. Set up a reminder
-                      to periodically check usage and ensure the monthly amount
-                      reflects actual consumption.
-                    </p>
-                    <div class="mt-4">
-                      ${Button({
-                        href: `/app/reminders/new?linkedEntityType=contract&linkedEntityId=${contract.id}&title=Check%20${encodeURIComponent(contract.name)}%20usage`,
-                        variant: "ghost",
-                        children: "Create Usage Reminder",
-                      })}
+          ${
+            contract.isUsageBased
+              ? html`
+                  <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                      <h3 class="card-title">Usage Tracking</h3>
+                      <p class="text-sm text-base-content/60">
+                        This contract has usage-based pricing. Set up a reminder
+                        to periodically check usage and ensure the monthly
+                        amount reflects actual consumption.
+                      </p>
+                      <div class="mt-4">
+                        ${Button({
+                          href: `/app/reminders/new?linkedEntityType=contract&linkedEntityId=${contract.id}&title=Check%20${encodeURIComponent(contract.name)}%20usage`,
+                          variant: "ghost",
+                          children: "Create Usage Reminder",
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              `
-            : ""}
-          ${contract.contractEndDate
-            ? html`
-                <div class="card bg-base-100 shadow-xl mt-4">
-                  <div class="card-body">
-                    <h3 class="card-title">Contract Renewal</h3>
-                    <p class="text-sm text-base-content/60">
-                      This contract ends on
-                      ${formatDate(contract.contractEndDate)}.
-                    </p>
-                    <div class="mt-4">
-                      ${Button({
-                        href: `/app/reminders/new?linkedEntityType=contract&linkedEntityId=${contract.id}&title=Review%20${encodeURIComponent(contract.name)}%20renewal`,
-                        variant: "ghost",
-                        children: "Create Renewal Reminder",
-                      })}
+                `
+              : ""
+          }
+          ${
+            contract.contractEndDate
+              ? html`
+                  <div class="card bg-base-100 shadow-xl mt-4">
+                    <div class="card-body">
+                      <h3 class="card-title">Contract Renewal</h3>
+                      <p class="text-sm text-base-content/60">
+                        This contract ends on
+                        ${formatDate(contract.contractEndDate)}.
+                      </p>
+                      <div class="mt-4">
+                        ${Button({
+                          href: `/app/reminders/new?linkedEntityType=contract&linkedEntityId=${contract.id}&title=Review%20${encodeURIComponent(contract.name)}%20renewal`,
+                          variant: "ghost",
+                          children: "Create Renewal Reminder",
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              `
-            : ""}
+                `
+              : ""
+          }
         </div>
       </div>
 
@@ -894,7 +916,7 @@ contractsRouter.post(
   handleFormPost({
     schema: contractFormSchema,
     command: updateContractCommand,
-    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+    data: (parsed, c) => ({ id: c.req.param("id")!, ...parsed }),
   }),
 );
 

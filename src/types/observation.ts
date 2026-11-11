@@ -1,9 +1,5 @@
 export type ObservationCategory =
-  | "routine"
-  | "mood"
-  | "physical"
-  | "home"
-  | "other";
+  "routine" | "mood" | "physical" | "home" | "other";
 
 export type Observation = {
   id: string;

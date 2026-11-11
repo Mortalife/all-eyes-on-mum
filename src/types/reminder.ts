@@ -1,9 +1,5 @@
 export type ReminderFrequency =
-  | "weekly"
-  | "monthly"
-  | "quarterly"
-  | "annually"
-  | "one-off";
+  "weekly" | "monthly" | "quarterly" | "annually" | "one-off";
 
 export type LinkedEntityType = "contract" | null;
 

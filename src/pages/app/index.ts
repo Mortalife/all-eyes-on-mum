@@ -220,50 +220,54 @@ const ContractsWidget = (
           </div>
         </div>
 
-        ${expiringContracts.length > 0
-          ? html`
-              <div class="mt-2">
-                <p class="text-sm font-medium text-warning mb-2">
-                  ${expiringContracts.length}
-                  contract${expiringContracts.length !== 1 ? "s" : ""} expiring
-                  soon
+        ${
+          expiringContracts.length > 0
+            ? html`
+                <div class="mt-2">
+                  <p class="text-sm font-medium text-warning mb-2">
+                    ${expiringContracts.length}
+                    contract${expiringContracts.length !== 1 ? "s" : ""}
+                    expiring soon
+                  </p>
+                  <ul class="space-y-2" role="list">
+                    ${expiringContracts.slice(0, 3).map((contract) => {
+                      const daysUntil = getDaysUntil(contract.contractEndDate!);
+                      return html`
+                        <li>
+                          <a
+                            href="/app/contracts/${contract.id}"
+                            class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors"
+                          >
+                            <div class="flex-1 min-w-0">
+                              <span class="font-medium truncate block"
+                                >${contract.name}</span
+                              >
+                              <span class="text-sm text-base-content/60"
+                                >${formatCurrency(
+                                  contract.monthlyAmount,
+                                )}/mo</span
+                              >
+                            </div>
+                            <span class="badge badge-warning badge-sm">
+                              ${
+                                daysUntil <= 7
+                                  ? `${daysUntil}d`
+                                  : formatDate(contract.contractEndDate!)
+                              }
+                            </span>
+                          </a>
+                        </li>
+                      `;
+                    })}
+                  </ul>
+                </div>
+              `
+            : html`
+                <p class="text-sm text-base-content/60 mt-2">
+                  No contracts expiring soon.
                 </p>
-                <ul class="space-y-2" role="list">
-                  ${expiringContracts.slice(0, 3).map((contract) => {
-                    const daysUntil = getDaysUntil(contract.contractEndDate!);
-                    return html`
-                      <li>
-                        <a
-                          href="/app/contracts/${contract.id}"
-                          class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors"
-                        >
-                          <div class="flex-1 min-w-0">
-                            <span class="font-medium truncate block"
-                              >${contract.name}</span
-                            >
-                            <span class="text-sm text-base-content/60"
-                              >${formatCurrency(
-                                contract.monthlyAmount,
-                              )}/mo</span
-                            >
-                          </div>
-                          <span class="badge badge-warning badge-sm">
-                            ${daysUntil <= 7
-                              ? `${daysUntil}d`
-                              : formatDate(contract.contractEndDate!)}
-                          </span>
-                        </a>
-                      </li>
-                    `;
-                  })}
-                </ul>
-              </div>
-            `
-          : html`
-              <p class="text-sm text-base-content/60 mt-2">
-                No contracts expiring soon.
-              </p>
-            `}
+              `
+        }
       </div>
     `,
   });
@@ -291,54 +295,61 @@ const DueRemindersWidget = (reminders: RecurringReminder[]) => {
                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            ${reminders.length > 0
-              ? `${reminders.length} reminder${reminders.length !== 1 ? "s" : ""} due`
-              : "Reminders"}
+            ${
+              reminders.length > 0
+                ? `${reminders.length} reminder${reminders.length !== 1 ? "s" : ""} due`
+                : "Reminders"
+            }
           </h2>
           <a href="/app/reminders" class="link link-primary text-sm"
             >View all</a
           >
         </div>
 
-        ${reminders.length === 0
-          ? html`
-              <div class="text-center py-4">
-                <p class="text-base-content/60 text-sm">
-                  No reminders due - you're all caught up!
-                </p>
-              </div>
-            `
-          : html`
-              <ul class="space-y-2" role="list">
-                ${reminders.slice(0, 4).map((reminder) => {
-                  const daysUntil = getDaysUntil(reminder.nextDue);
-                  const isOverdue = daysUntil < 0;
-                  return html`
-                    <li>
-                      <a
-                        href="/app/reminders/${reminder.id}"
-                        class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors"
-                      >
-                        <div class="flex-1 min-w-0">
-                          <span class="font-medium truncate block"
-                            >${reminder.title}</span
-                          >
-                        </div>
-                        ${isOverdue
-                          ? html`<span class="badge badge-error badge-sm"
-                              >Overdue</span
-                            >`
-                          : daysUntil === 0
-                            ? html`<span class="badge badge-warning badge-sm"
-                                >Today</span
-                              >`
-                            : ""}
-                      </a>
-                    </li>
-                  `;
-                })}
-              </ul>
-            `}
+        ${
+          reminders.length === 0
+            ? html`
+                <div class="text-center py-4">
+                  <p class="text-base-content/60 text-sm">
+                    No reminders due - you're all caught up!
+                  </p>
+                </div>
+              `
+            : html`
+                <ul class="space-y-2" role="list">
+                  ${reminders.slice(0, 4).map((reminder) => {
+                    const daysUntil = getDaysUntil(reminder.nextDue);
+                    const isOverdue = daysUntil < 0;
+                    return html`
+                      <li>
+                        <a
+                          href="/app/reminders/${reminder.id}"
+                          class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors"
+                        >
+                          <div class="flex-1 min-w-0">
+                            <span class="font-medium truncate block"
+                              >${reminder.title}</span
+                            >
+                          </div>
+                          ${
+                            isOverdue
+                              ? html`<span class="badge badge-error badge-sm"
+                                  >Overdue</span
+                                >`
+                              : daysUntil === 0
+                                ? html`<span
+                                    class="badge badge-warning badge-sm"
+                                    >Today</span
+                                  >`
+                                : ""
+                          }
+                        </a>
+                      </li>
+                    `;
+                  })}
+                </ul>
+              `
+        }
       </div>
     `,
   });
@@ -378,65 +389,72 @@ const UpcomingAppointmentsWidget = (appointments: Appointment[]) => {
           >
         </div>
 
-        ${appointments.length === 0
-          ? html`
-              <div class="text-center py-6">
-                <p class="text-base-content/60">No appointments this week.</p>
-              </div>
-            `
-          : html`
-              <ul class="space-y-2" role="list">
-                ${appointments.map((apt) => {
-                  const { label: dayLabel, isUrgent } = getRelativeDayLabel(
-                    apt.datetime,
-                  );
-                  const time = new Date(apt.datetime).toLocaleTimeString(
-                    "en-GB",
-                    {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    },
-                  );
+        ${
+          appointments.length === 0
+            ? html`
+                <div class="text-center py-6">
+                  <p class="text-base-content/60">No appointments this week.</p>
+                </div>
+              `
+            : html`
+                <ul class="space-y-2" role="list">
+                  ${appointments.map((apt) => {
+                    const { label: dayLabel, isUrgent } = getRelativeDayLabel(
+                      apt.datetime,
+                    );
+                    const time = new Date(apt.datetime).toLocaleTimeString(
+                      "en-GB",
+                      {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      },
+                    );
 
-                  return html`
-                    <li>
-                      <a
-                        href="/app/appointments/${apt.id}"
-                        class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors ${apt.type ===
-                        "medical"
-                          ? "border-l-2 border-error"
-                          : ""}"
-                      >
-                        <div class="flex-1 min-w-0">
-                          <span class="font-medium truncate block"
-                            >${apt.title}</span
-                          >
-                          <span class="text-sm text-base-content/60"
-                            >${time}</span
-                          >
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <span
-                            class="badge ${TYPE_BADGE_CLASSES[
-                              apt.type
-                            ]} badge-sm"
-                            >${TYPE_LABELS[apt.type]}</span
-                          >
-                          ${isUrgent
-                            ? html`<span class="badge badge-warning badge-sm"
-                                >${dayLabel}</span
-                              >`
-                            : html`<span class="text-sm text-base-content/60"
-                                >${dayLabel}</span
-                              >`}
-                        </div>
-                      </a>
-                    </li>
-                  `;
-                })}
-              </ul>
-            `}
+                    return html`
+                      <li>
+                        <a
+                          href="/app/appointments/${apt.id}"
+                          class="flex items-center justify-between p-2 rounded hover:bg-base-200 transition-colors ${
+                            apt.type === "medical"
+                              ? "border-l-2 border-error"
+                              : ""
+                          }"
+                        >
+                          <div class="flex-1 min-w-0">
+                            <span class="font-medium truncate block"
+                              >${apt.title}</span
+                            >
+                            <span class="text-sm text-base-content/60"
+                              >${time}</span
+                            >
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <span
+                              class="badge ${
+                                TYPE_BADGE_CLASSES[apt.type]
+                              } badge-sm"
+                              >${TYPE_LABELS[apt.type]}</span
+                            >
+                            ${
+                              isUrgent
+                                ? html`<span
+                                    class="badge badge-warning badge-sm"
+                                    >${dayLabel}</span
+                                  >`
+                                : html`<span
+                                    class="text-sm text-base-content/60"
+                                    >${dayLabel}</span
+                                  >`
+                            }
+                          </div>
+                        </a>
+                      </li>
+                    `;
+                  })}
+                </ul>
+              `
+        }
       </div>
     `,
   });
@@ -491,26 +509,28 @@ const RecentNotesWidget = (notes: Note[]) => {
           </div>
         </form>
 
-        ${notes.length === 0
-          ? html`
-              <div class="text-center py-4">
-                <p class="text-base-content/60 text-sm">No active notes.</p>
-              </div>
-            `
-          : html`
-              <ul class="space-y-2" role="list">
-                ${notes.map(
-                  (note) => html`
-                    <li class="p-2 bg-base-200 rounded text-sm">
-                      <p class="line-clamp-2">${note.content}</p>
-                      <p class="text-xs text-base-content/50 mt-1">
-                        ${formatDate(note.createdAt)}
-                      </p>
-                    </li>
-                  `,
-                )}
-              </ul>
-            `}
+        ${
+          notes.length === 0
+            ? html`
+                <div class="text-center py-4">
+                  <p class="text-base-content/60 text-sm">No active notes.</p>
+                </div>
+              `
+            : html`
+                <ul class="space-y-2" role="list">
+                  ${notes.map(
+                    (note) => html`
+                      <li class="p-2 bg-base-200 rounded text-sm">
+                        <p class="line-clamp-2">${note.content}</p>
+                        <p class="text-xs text-base-content/50 mt-1">
+                          ${formatDate(note.createdAt)}
+                        </p>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `
+        }
       </div>
     `,
   });
@@ -551,43 +571,47 @@ const RecentObservationsWidget = (observations: Observation[]) => {
           >
         </div>
 
-        ${observations.length === 0
-          ? html`
-              <div class="text-center py-4">
-                <p class="text-base-content/60 text-sm">No observations yet.</p>
-                <a
-                  href="/app/observations/new"
-                  class="btn btn-ghost btn-sm mt-2"
-                  >Add observation</a
-                >
-              </div>
-            `
-          : html`
-              <ul class="space-y-3" role="list">
-                ${observations.map(
-                  (obs) => html`
-                    <li class="border-l-2 border-base-300 pl-3">
-                      <p class="text-sm line-clamp-2">${obs.content}</p>
-                      <div class="flex items-center gap-2 mt-1">
-                        <span class="badge badge-ghost badge-sm"
-                          >${OBSERVATION_CATEGORY_LABELS[obs.category]}</span
-                        >
-                        <span class="text-xs text-base-content/50"
-                          >${formatDate(obs.observedAt)}</span
-                        >
-                      </div>
-                    </li>
-                  `,
-                )}
-              </ul>
-              <div class="mt-3">
-                <a
-                  href="/app/observations/new"
-                  class="btn btn-ghost btn-sm btn-block"
-                  >Add observation</a
-                >
-              </div>
-            `}
+        ${
+          observations.length === 0
+            ? html`
+                <div class="text-center py-4">
+                  <p class="text-base-content/60 text-sm">
+                    No observations yet.
+                  </p>
+                  <a
+                    href="/app/observations/new"
+                    class="btn btn-ghost btn-sm mt-2"
+                    >Add observation</a
+                  >
+                </div>
+              `
+            : html`
+                <ul class="space-y-3" role="list">
+                  ${observations.map(
+                    (obs) => html`
+                      <li class="border-l-2 border-base-300 pl-3">
+                        <p class="text-sm line-clamp-2">${obs.content}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                          <span class="badge badge-ghost badge-sm"
+                            >${OBSERVATION_CATEGORY_LABELS[obs.category]}</span
+                          >
+                          <span class="text-xs text-base-content/50"
+                            >${formatDate(obs.observedAt)}</span
+                          >
+                        </div>
+                      </li>
+                    `,
+                  )}
+                </ul>
+                <div class="mt-3">
+                  <a
+                    href="/app/observations/new"
+                    class="btn btn-ghost btn-sm btn-block"
+                    >Add observation</a
+                  >
+                </div>
+              `
+        }
       </div>
     `,
   });

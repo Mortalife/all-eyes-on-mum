@@ -227,12 +227,16 @@ const BillForm = (props: {
   const { bill, action, submitLabel, errors } = props;
 
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('${action}')"
-      data-signals="${JSON.stringify({
+      data-signals__ifmissing="${JSON.stringify({
         name: bill?.name || "",
         amount: bill?.amount?.toString() || "",
         frequency: bill?.frequency || "monthly",
@@ -381,9 +385,13 @@ const PaymentForm = ({
   errors: FormErrors | null;
 }) => {
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('/app/bills/${bill.id}/pay')"
       data-signals="${JSON.stringify({
@@ -697,15 +705,17 @@ const renderBillDetailContent = (state: BillDetailPageState) => {
                 </div>
               </dl>
 
-              ${bill.notes
-                ? html`
-                    <div class="divider"></div>
-                    <div>
-                      <h3 class="text-sm text-base-content/60 mb-1">Notes</h3>
-                      <p>${bill.notes}</p>
-                    </div>
-                  `
-                : ""}
+              ${
+                bill.notes
+                  ? html`
+                      <div class="divider"></div>
+                      <div>
+                        <h3 class="text-sm text-base-content/60 mb-1">Notes</h3>
+                        <p>${bill.notes}</p>
+                      </div>
+                    `
+                  : ""
+              }
 
               <div class="divider"></div>
 
@@ -760,14 +770,14 @@ const billDetailResource = createFormResource({
   schema: paymentFormSchema,
   command: markBillPaidCommand,
   data: (parsed, c) => ({
-    billId: c.req.param("id"),
+    billId: c.req.param("id")!,
     amount: parsed.amount,
     notes: parsed.notes,
   }),
   eventTypes: ["bill.*", "notification.*"],
   errorRedirect: "/app/bills",
   loadState: async (_user, c, cid) => {
-    const id = c.req.param("id");
+    const id = c.req.param("id")!;
     const bill = await getBill(id);
     if (!bill) throw new Error("Bill not found");
     const payments = await getBillPayments(id);
@@ -882,7 +892,7 @@ billsRouter.post(
   handleFormPost({
     schema: billFormSchema,
     command: updateBillCommand,
-    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+    data: (parsed, c) => ({ id: c.req.param("id")!, ...parsed }),
   }),
 );
 

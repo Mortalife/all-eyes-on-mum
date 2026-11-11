@@ -5,7 +5,7 @@ const envSchema = z.object({
   BASE_URL: z.string().default("http://localhost:3000"),
   DATABASE_PATH: z.string().optional(),
   NODE_ENV: z.string().optional(),
-  ADMIN_EMAIL: z.string().email("ADMIN_EMAIL must be a valid email"),
+  ADMIN_EMAIL: z.email("ADMIN_EMAIL must be a valid email"),
 });
 
 export const env = envSchema.parse(process.env);

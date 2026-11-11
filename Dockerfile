@@ -1,7 +1,7 @@
 # Stage 1: Install dependencies
-FROM node:24-slim AS deps
+FROM node:26-slim AS deps
 
-RUN corepack enable pnpm
+RUN npm install -g corepack@latest && corepack enable pnpm
 
 WORKDIR /app
 
@@ -10,9 +10,9 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build application
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 
-RUN corepack enable pnpm
+RUN npm install -g corepack@latest && corepack enable pnpm
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN pnpm run build
 RUN pnpm prune --prod
 
 # Stage 3: Production image with Litestream
-FROM node:24-slim AS production
+FROM node:26-slim AS production
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates wget && \

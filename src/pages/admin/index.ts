@@ -35,7 +35,7 @@ adminRouter.use("*", requireRole("admin"));
 
 // Validation schema for creating users (no password - users set it via invite link)
 const createUserSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   name: z.string().min(1, "Name is required"),
 });
 
@@ -61,30 +61,34 @@ const UsersTable = ({ users }: { users: UserWithStatus[] }) => html`
               <td>${user.email}</td>
               <td>
                 <span
-                  class="badge ${user.role === "admin"
-                    ? "badge-primary"
-                    : "badge-ghost"}"
+                  class="badge ${
+                    user.role === "admin" ? "badge-primary" : "badge-ghost"
+                  }"
                 >
                   ${user.role}
                 </span>
               </td>
               <td>
-                ${user.hasPassword
-                  ? html`<span class="badge badge-success">Active</span>`
-                  : html`<span class="badge badge-warning">Pending</span>`}
+                ${
+                  user.hasPassword
+                    ? html`<span class="badge badge-success">Active</span>`
+                    : html`<span class="badge badge-warning">Pending</span>`
+                }
               </td>
               <td>${new Date(user.createdAt).toLocaleDateString()}</td>
               <td>
-                ${!user.hasPassword
-                  ? html`
-                      <button
-                        class="btn btn-xs btn-outline"
-                        data-on:click="@post('/admin/users/${user.id}/invite')"
-                      >
-                        Generate Invite Link
-                      </button>
-                    `
-                  : ""}
+                ${
+                  !user.hasPassword
+                    ? html`
+                        <button
+                          class="btn btn-xs btn-outline"
+                          data-on:click="@post('/admin/users/${user.id}/invite')"
+                        >
+                          Generate Invite Link
+                        </button>
+                      `
+                    : ""
+                }
               </td>
             </tr>
           `,
@@ -96,9 +100,11 @@ const UsersTable = ({ users }: { users: UserWithStatus[] }) => html`
 
 // Create user form component (no password field — users set it via invite link)
 const CreateUserForm = ({ errors }: { errors: FormErrors | null }) => html`
-  ${errors?.formErrors?.length
-    ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-    : ""}
+  ${
+    errors?.formErrors?.length
+      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
+      : ""
+  }
   <form
     data-on:submit="@post('/admin/users/create')"
     data-signals="${JSON.stringify({
@@ -179,9 +185,11 @@ const InviteLinkAlert = ({
 // Admin users content renderer (used by both GET and SSE)
 const renderAdminUsersContent = (state: AdminUsersPageState) => html`
   <div id="admin-users-content">
-    ${state.inviteResult
-      ? InviteLinkAlert({ inviteResult: state.inviteResult })
-      : ""}
+    ${
+      state.inviteResult
+        ? InviteLinkAlert({ inviteResult: state.inviteResult })
+        : ""
+    }
     <div class="space-y-6">
       <!-- Create user form -->
       <div class="max-w-md">
@@ -202,9 +210,11 @@ const renderAdminUsersContent = (state: AdminUsersPageState) => html`
         children: html`
           <div class="card-body">
             <h2 class="card-title">Family Members</h2>
-            ${state.users.length > 0
-              ? UsersTable({ users: state.users })
-              : html`<p class="text-base-content/60">No users yet</p>`}
+            ${
+              state.users.length > 0
+                ? UsersTable({ users: state.users })
+                : html`<p class="text-base-content/60">No users yet</p>`
+            }
           </div>
         `,
       })}

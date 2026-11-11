@@ -1,11 +1,7 @@
 export type BillFrequency = "monthly" | "quarterly" | "annual" | "one-off";
 
 export type BillCategory =
-  | "utilities"
-  | "insurance"
-  | "subscriptions"
-  | "housing"
-  | "other";
+  "utilities" | "insurance" | "subscriptions" | "housing" | "other";
 
 export type Bill = {
   id: string;

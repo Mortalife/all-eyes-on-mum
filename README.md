@@ -110,7 +110,7 @@ The RustFS console is available at `http://localhost:9001` (login: `rustfsadmin`
 | `LITESTREAM_REPLICA_ENDPOINT` | app     | S3 endpoint URL                           |
 | `LITESTREAM_REPLICA_REGION`   | app     | S3 region                                 |
 | `AWS_ACCESS_KEY_ID`           | app     | S3 access key                             |
-| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |         |
+| `AWS_SECRET_ACCESS_KEY`       | app     | S3 secret key                             |     |
 
 ## Access
 

@@ -2,8 +2,8 @@ import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getCssPath } from "../../lib/vite-manifest.ts";
 
-export const DATASTAR_CDN_URL =
-  "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.6/bundles/datastar.js";
+// Vendored from https://github.com/starfederation/datastar/releases/tag/v1.0.5 (public/ is copied to dist-public by Vite)
+export const DATASTAR_URL = "/dist/datastar-1.0.5.js";
 
 type BaseLayoutProps = {
   title: string;
@@ -21,7 +21,7 @@ export const BaseLayout = ({ title, children }: BaseLayoutProps) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>${title}</title>
         ${cssPath ? html`<link rel="stylesheet" href="${cssPath}" />` : ""}
-        <script type="module" src="${DATASTAR_CDN_URL}"></script>
+        <script type="module" src="${DATASTAR_URL}"></script>
       </head>
       <body class="min-h-screen bg-base-200">
         ${children}

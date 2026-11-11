@@ -208,11 +208,13 @@ const AddObservationForm = ({ errors }: { errors: FormErrors | null }) => html`
             </svg>
             Add Observation
           </h2>
-          ${errors?.formErrors?.length
-            ? html`<div class="alert alert-error mb-4">
-                ${errors.formErrors[0]}
-              </div>`
-            : ""}
+          ${
+            errors?.formErrors?.length
+              ? html`<div class="alert alert-error mb-4">
+                  ${errors.formErrors[0]}
+                </div>`
+              : ""
+          }
           <form
             data-on:submit="@post('/app/observations')"
             data-signals="${JSON.stringify({
@@ -519,16 +521,20 @@ const renderObservationsContent = (state: ObservationsPageState) => html`
               />
             </svg>
             Timeline
-            ${state.activeCategory
-              ? html` <span class="badge badge-ghost ml-2"
-                  >${CATEGORY_LABELS[state.activeCategory]}</span
-                >`
-              : ""}
-            ${state.searchQuery
-              ? html` <span class="badge badge-ghost ml-2"
-                  >Search: "${state.searchQuery}"</span
-                >`
-              : ""}
+            ${
+              state.activeCategory
+                ? html` <span class="badge badge-ghost ml-2"
+                    >${CATEGORY_LABELS[state.activeCategory]}</span
+                  >`
+                : ""
+            }
+            ${
+              state.searchQuery
+                ? html` <span class="badge badge-ghost ml-2"
+                    >Search: "${state.searchQuery}"</span
+                  >`
+                : ""
+            }
           </h2>
 
           ${FilterBar(state.activeCategory, state.searchQuery)}

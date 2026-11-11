@@ -1,4 +1,5 @@
-import type { Context, Next } from "hono";
+import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
 
 type RateLimitEntry = {
   count: number;
@@ -30,7 +31,7 @@ const getClientIp = (c: Context): string => {
 
 // Creates a rate limiting middleware that restricts requests per IP within a time window
 export const rateLimit = ({ windowMs, maxRequests }: RateLimitOptions) => {
-  return async (c: Context, next: Next) => {
+  return createMiddleware(async (c, next) => {
     const ip = getClientIp(c);
     const key = `${ip}:${c.req.path}`;
     const now = Date.now();
@@ -51,5 +52,5 @@ export const rateLimit = ({ windowMs, maxRequests }: RateLimitOptions) => {
 
     entry.count++;
     await next();
-  };
+  });
 };

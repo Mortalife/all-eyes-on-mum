@@ -494,11 +494,13 @@ export const UsersPageContent = ({ users, query, uiState }) => html`
         data-bind="query"
         data-on:keydown="if (event.key === 'Enter') @post('/admin/users/search')"
       />
-      ${query
-        ? html`<button data-on:click="@post('/admin/users/search/clear')">
-            Clear
-          </button>`
-        : ""}
+      ${
+        query
+          ? html`<button data-on:click="@post('/admin/users/search/clear')">
+              Clear
+            </button>`
+          : ""
+      }
     </div>
 
     <!-- Users table -->
@@ -506,9 +508,14 @@ export const UsersPageContent = ({ users, query, uiState }) => html`
 
     <!-- Modal container (conditionally rendered) -->
     <div id="admin-user-modal">
-      ${uiState?.modalType
-        ? ServerUserModal({ user: selectedUser, modalType: uiState.modalType })
-        : ""}
+      ${
+        uiState?.modalType
+          ? ServerUserModal({
+              user: selectedUser,
+              modalType: uiState.modalType,
+            })
+          : ""
+      }
     </div>
   </div>
 `;

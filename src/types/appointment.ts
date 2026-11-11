@@ -1,9 +1,5 @@
 export type AppointmentType =
-  | "medical"
-  | "home"
-  | "financial"
-  | "social"
-  | "other";
+  "medical" | "home" | "financial" | "social" | "other";
 
 export type Appointment = {
   id: string;

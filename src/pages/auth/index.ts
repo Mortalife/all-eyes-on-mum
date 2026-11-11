@@ -40,12 +40,12 @@ const inviteRegisterRateLimit = rateLimit({
 
 // Validation schemas
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
 const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   name: z.string().min(1, "Name is required"),
 });
@@ -135,14 +135,16 @@ const LoginForm = ({
     <div class="form-control mt-6">
       ${Button({ children: "Login", type: "submit", variant: "primary" })}
     </div>
-    ${showRegisterLink
-      ? html`
-          <p class="text-center text-sm mt-4">
-            Don't have an account?
-            <a href="/auth/register" class="link link-primary">Register</a>
-          </p>
-        `
-      : ""}
+    ${
+      showRegisterLink
+        ? html`
+            <p class="text-center text-sm mt-4">
+              Don't have an account?
+              <a href="/auth/register" class="link link-primary">Register</a>
+            </p>
+          `
+        : ""
+    }
   </form>
 `;
 
@@ -255,7 +257,7 @@ authRouter.post("/login", loginRateLimit, async (c) => {
         title: "Login",
         children: LoginForm({
           email: data.email,
-          error: parsed.error.errors[0].message,
+          error: parsed.error.issues[0].message,
           showRegisterLink: registrationOpen,
         }),
       }),
@@ -363,7 +365,7 @@ authRouter.post("/register", registerRateLimit, async (c) => {
         children: RegisterForm({
           name: data.name,
           email: data.email,
-          error: parsed.error.errors[0].message,
+          error: parsed.error.issues[0].message,
         }),
       }),
     );

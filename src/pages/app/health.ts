@@ -247,18 +247,20 @@ const SearchBox = (query: string) => html`
         </svg>
       </button>
     </div>
-    ${query
-      ? html`
-          <div class="mt-2">
-            <span class="text-sm text-base-content/60"
-              >Showing results for "${query}"</span
-            >
-            <a href="/app/health" class="btn btn-ghost btn-xs ml-2"
-              >Clear search</a
-            >
-          </div>
-        `
-      : ""}
+    ${
+      query
+        ? html`
+            <div class="mt-2">
+              <span class="text-sm text-base-content/60"
+                >Showing results for "${query}"</span
+              >
+              <a href="/app/health" class="btn btn-ghost btn-xs ml-2"
+                >Clear search</a
+              >
+            </div>
+          `
+        : ""
+    }
   </div>
 `;
 
@@ -273,12 +275,16 @@ const HealthNoteForm = (props: {
   const today = new Date().toISOString().split("T")[0];
 
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('${action}')"
-      data-signals="${JSON.stringify({
+      data-signals__ifmissing="${JSON.stringify({
         title: note?.title || "",
         content: note?.content || "",
         category: note?.category || "general",
@@ -438,11 +444,13 @@ const renderHealthContent = (state: HealthPageState) => html`
             />
           </svg>
           <h2 class="card-title">
-            ${state.searchQuery
-              ? "Search Results"
-              : state.category
-                ? `${CATEGORY_LABELS[state.category]} Notes`
-                : "Health Timeline"}
+            ${
+              state.searchQuery
+                ? "Search Results"
+                : state.category
+                  ? `${CATEGORY_LABELS[state.category]} Notes`
+                  : "Health Timeline"
+            }
           </h2>
         </div>
         ${HealthNotesTimeline(state.notes)}
@@ -486,8 +494,9 @@ healthRouter.get("/", async (c) => {
           ${Button({ href: "/app/health/new", children: "Add Note" })}
         </div>
         <div
-          data-init="@get('/app/health/sse?category=${category ||
-          ""}&search=${encodeURIComponent(searchQuery)}')"
+          data-init="@get('/app/health/sse?category=${
+            category || ""
+          }&search=${encodeURIComponent(searchQuery)}')"
         >
           ${renderHealthContent({
             notes,
@@ -830,7 +839,7 @@ healthRouter.post(
   handleFormPost({
     schema: healthNoteFormSchema,
     command: updateHealthNoteCommand,
-    data: (parsed, c) => ({ id: c.req.param("id"), ...parsed }),
+    data: (parsed, c) => ({ id: c.req.param("id")!, ...parsed }),
   }),
 );
 

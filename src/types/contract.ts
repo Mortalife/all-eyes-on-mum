@@ -1,11 +1,7 @@
 export type PaymentMethod = "direct_debit" | "standing_order" | "manual";
 
 export type ContractCategory =
-  | "utilities"
-  | "insurance"
-  | "subscriptions"
-  | "housing"
-  | "other";
+  "utilities" | "insurance" | "subscriptions" | "housing" | "other";
 
 export type Contract = {
   id: string;

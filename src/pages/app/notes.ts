@@ -151,23 +151,27 @@ const QuickAddForm = ({ errors }: { errors: FormErrors | null }) => html`
         type="text"
         id="note-content"
         name="content"
-        class="input input-bordered flex-1 ${errors?.fieldErrors?.content
-          ? "input-error"
-          : ""}"
+        class="input input-bordered flex-1 ${
+          errors?.fieldErrors?.content ? "input-error" : ""
+        }"
         placeholder="Add a quick note... (e.g., Boiler's making a noise)"
         data-bind="content"
         autofocus
       />
       ${Button({ type: "submit", children: "Add" })}
     </form>
-    ${errors?.fieldErrors?.content
-      ? html`<p class="text-error text-sm mt-1">
-          ${errors.fieldErrors.content[0]}
-        </p>`
-      : ""}
-    ${errors?.formErrors?.length
-      ? html`<p class="text-error text-sm mt-1">${errors.formErrors[0]}</p>`
-      : ""}
+    ${
+      errors?.fieldErrors?.content
+        ? html`<p class="text-error text-sm mt-1">
+            ${errors.fieldErrors.content[0]}
+          </p>`
+        : ""
+    }
+    ${
+      errors?.formErrors?.length
+        ? html`<p class="text-error text-sm mt-1">${errors.formErrors[0]}</p>`
+        : ""
+    }
   </div>
 `;
 
@@ -183,63 +187,67 @@ const NoteItem = (note: NoteWithAuthor) => {
         </p>
         <p class="text-sm text-base-content/50 mt-1">
           ${note.authorName}, ${formatTimeAgo(note.createdAt)}
-          ${note.resolved && note.resolverName
-            ? html` - resolved by ${note.resolverName}`
-            : ""}
+          ${
+            note.resolved && note.resolverName
+              ? html` - resolved by ${note.resolverName}`
+              : ""
+          }
         </p>
       </div>
       <div class="flex items-center gap-1 shrink-0">
-        ${note.resolved
-          ? html`
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm btn-circle"
-                aria-label="Mark as unresolved"
-                title="Undo resolve"
-                data-on:click="@post('/app/notes/${note.id}/unresolve')"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
+        ${
+          note.resolved
+            ? html`
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm btn-circle"
+                  aria-label="Mark as unresolved"
+                  title="Undo resolve"
+                  data-on:click="@post('/app/notes/${note.id}/unresolve')"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                  />
-                </svg>
-              </button>
-            `
-          : html`
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm btn-circle text-success"
-                aria-label="Mark as resolved"
-                title="Resolve"
-                data-on:click="@post('/app/notes/${note.id}/resolve')"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
+                  </svg>
+                </button>
+              `
+            : html`
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm btn-circle text-success"
+                  aria-label="Mark as resolved"
+                  title="Resolve"
+                  data-on:click="@post('/app/notes/${note.id}/resolve')"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </button>
-            `}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </button>
+              `
+        }
         <button
           type="button"
           class="btn btn-ghost btn-sm btn-circle text-error"

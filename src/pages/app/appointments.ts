@@ -157,34 +157,36 @@ const AppointmentCard = (appointment: Appointment) => {
             <p class="text-sm text-base-content/70 mt-1">
               ${formatDateTime(appointment.datetime)}
             </p>
-            ${appointment.location
-              ? html`
-                  <p class="text-sm text-base-content/60 mt-1 truncate">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-4 w-4 inline-block mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                      />
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    ${appointment.location}
-                  </p>
-                `
-              : ""}
+            ${
+              appointment.location
+                ? html`
+                    <p class="text-sm text-base-content/60 mt-1 truncate">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 inline-block mr-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                        />
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                      ${appointment.location}
+                    </p>
+                  `
+                : ""
+            }
           </div>
           <div class="flex flex-col items-end gap-1">
             ${TypeBadge(appointment.type)}
@@ -225,12 +227,16 @@ const AppointmentForm = (props: {
   const { appointment, action, submitLabel, errors } = props;
 
   return html`
-    ${errors?.formErrors?.length
-      ? html`<div class="alert alert-error mb-4">${errors.formErrors[0]}</div>`
-      : ""}
+    ${
+      errors?.formErrors?.length
+        ? html`<div class="alert alert-error mb-4">
+            ${errors.formErrors[0]}
+          </div>`
+        : ""
+    }
     <form
       data-on:submit="@post('${action}')"
-      data-signals="${JSON.stringify({
+      data-signals__ifmissing="${JSON.stringify({
         title: appointment?.title || "",
         description: appointment?.description || "",
         datetime: appointment?.datetime
@@ -443,37 +449,39 @@ const renderAppointmentsContent = (state: AppointmentsPageState) => html`
               </svg>
               Upcoming Appointments
             </h2>
-            ${state.upcomingAppointments.length === 0
-              ? html`
-                  <div class="text-center py-12">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-16 w-16 mx-auto text-base-content/30 mb-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <h3 class="text-lg font-medium text-base-content/70">
-                      No upcoming appointments
-                    </h3>
-                    <p class="text-base-content/50 mt-1">
-                      Add an appointment to start tracking.
-                    </p>
-                  </div>
-                `
-              : AppointmentsList(
-                  state.upcomingAppointments,
-                  "Upcoming",
-                  "No upcoming appointments",
-                )}
+            ${
+              state.upcomingAppointments.length === 0
+                ? html`
+                    <div class="text-center py-12">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-16 w-16 mx-auto text-base-content/30 mb-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <h3 class="text-lg font-medium text-base-content/70">
+                        No upcoming appointments
+                      </h3>
+                      <p class="text-base-content/50 mt-1">
+                        Add an appointment to start tracking.
+                      </p>
+                    </div>
+                  `
+                : AppointmentsList(
+                    state.upcomingAppointments,
+                    "Upcoming",
+                    "No upcoming appointments",
+                  )
+            }
           </div>
         </div>
       </div>
@@ -500,32 +508,34 @@ const renderAppointmentsContent = (state: AppointmentsPageState) => html`
               </svg>
               Past Appointments
             </h2>
-            ${state.pastAppointments.length === 0
-              ? html`<p class="text-sm text-base-content/50">
-                  No past appointments.
-                </p>`
-              : html`
-                  <div class="space-y-2">
-                    ${state.pastAppointments.map(
-                      (apt) => html`
-                        <a
-                          href="/app/appointments/${apt.id}"
-                          class="block p-2 rounded hover:bg-base-200 transition-colors"
-                        >
-                          <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium truncate"
-                              >${apt.title}</span
-                            >
-                            ${TypeBadge(apt.type)}
-                          </div>
-                          <p class="text-xs text-base-content/60">
-                            ${formatDate(apt.datetime)}
-                          </p>
-                        </a>
-                      `,
-                    )}
-                  </div>
-                `}
+            ${
+              state.pastAppointments.length === 0
+                ? html`<p class="text-sm text-base-content/50">
+                    No past appointments.
+                  </p>`
+                : html`
+                    <div class="space-y-2">
+                      ${state.pastAppointments.map(
+                        (apt) => html`
+                          <a
+                            href="/app/appointments/${apt.id}"
+                            class="block p-2 rounded hover:bg-base-200 transition-colors"
+                          >
+                            <div class="flex items-center justify-between">
+                              <span class="text-sm font-medium truncate"
+                                >${apt.title}</span
+                              >
+                              ${TypeBadge(apt.type)}
+                            </div>
+                            <p class="text-xs text-base-content/60">
+                              ${formatDate(apt.datetime)}
+                            </p>
+                          </a>
+                        `,
+                      )}
+                    </div>
+                  `
+            }
           </div>
         </div>
       </div>
@@ -708,47 +718,51 @@ const renderAppointmentDetailContent = (state: AppointmentDetailPageState) => {
                     ${formatDateTime(appointment.datetime)}
                   </dd>
                 </div>
-                ${appointment.endTime
-                  ? html`
-                      <div>
-                        <dt class="text-sm text-base-content/60">End Time</dt>
-                        <dd class="text-lg font-semibold">
-                          ${formatDateTime(appointment.endTime)}
-                        </dd>
-                      </div>
-                    `
-                  : ""}
-                ${appointment.location
-                  ? html`
-                      <div class="md:col-span-2">
-                        <dt class="text-sm text-base-content/60">Location</dt>
-                        <dd class="text-lg">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 inline-block mr-1 text-base-content/60"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                            />
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                          </svg>
-                          ${appointment.location}
-                        </dd>
-                      </div>
-                    `
-                  : ""}
+                ${
+                  appointment.endTime
+                    ? html`
+                        <div>
+                          <dt class="text-sm text-base-content/60">End Time</dt>
+                          <dd class="text-lg font-semibold">
+                            ${formatDateTime(appointment.endTime)}
+                          </dd>
+                        </div>
+                      `
+                    : ""
+                }
+                ${
+                  appointment.location
+                    ? html`
+                        <div class="md:col-span-2">
+                          <dt class="text-sm text-base-content/60">Location</dt>
+                          <dd class="text-lg">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-5 w-5 inline-block mr-1 text-base-content/60"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                              />
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                            ${appointment.location}
+                          </dd>
+                        </div>
+                      `
+                    : ""
+                }
                 <div>
                   <dt class="text-sm text-base-content/60">Reminder</dt>
                   <dd>
@@ -758,19 +772,21 @@ const renderAppointmentDetailContent = (state: AppointmentDetailPageState) => {
                 </div>
               </dl>
 
-              ${appointment.description
-                ? html`
-                    <div class="divider"></div>
-                    <div>
-                      <h3 class="text-sm text-base-content/60 mb-1">
-                        Description
-                      </h3>
-                      <p class="whitespace-pre-wrap">
-                        ${appointment.description}
-                      </p>
-                    </div>
-                  `
-                : ""}
+              ${
+                appointment.description
+                  ? html`
+                      <div class="divider"></div>
+                      <div>
+                        <h3 class="text-sm text-base-content/60 mb-1">
+                          Description
+                        </h3>
+                        <p class="whitespace-pre-wrap">
+                          ${appointment.description}
+                        </p>
+                      </div>
+                    `
+                  : ""
+              }
 
               <div class="divider"></div>
 
@@ -941,7 +957,7 @@ appointmentsRouter.post(
     schema: appointmentFormSchema,
     command: updateAppointmentCommand,
     data: (parsed, c) => ({
-      id: c.req.param("id"),
+      id: c.req.param("id")!,
       ...parsed,
       datetime: new Date(parsed.datetime).toISOString(),
       endTime: parsed.endTime ? new Date(parsed.endTime).toISOString() : null,

@@ -104,56 +104,62 @@ const getNotificationIcon = (type: Notification["type"]) => {
 // Renders a single notification item for the full page list
 const NotificationListItem = (notification: Notification) => html`
   <div
-    class="flex items-start gap-4 p-4 rounded-lg ${notification.read
-      ? "opacity-60"
-      : "bg-base-200/50"}"
+    class="flex items-start gap-4 p-4 rounded-lg ${
+      notification.read ? "opacity-60" : "bg-base-200/50"
+    }"
   >
     <div class="shrink-0 mt-0.5">${getNotificationIcon(notification.type)}</div>
     <div class="flex-1 min-w-0">
-      ${notification.title
-        ? html`<p class="font-medium">${notification.title}</p>`
-        : ""}
+      ${
+        notification.title
+          ? html`<p class="font-medium">${notification.title}</p>`
+          : ""
+      }
       <p class="text-sm text-base-content/70">${notification.message}</p>
       <div class="flex items-center gap-3 mt-1">
         <span class="text-xs text-base-content/50">
           ${formatTimeAgo(notification.createdAt)}
         </span>
-        ${notification.actionUrl
-          ? html`<a
-              href="${notification.actionUrl}"
-              class="text-xs link link-primary"
-              >View</a
-            >`
-          : ""}
+        ${
+          notification.actionUrl
+            ? html`<a
+                href="${notification.actionUrl}"
+                class="text-xs link link-primary"
+                >View</a
+              >`
+            : ""
+        }
       </div>
     </div>
     <div class="flex items-center gap-1 shrink-0">
-      ${!notification.read
-        ? html`
-            <button
-              type="button"
-              class="btn btn-ghost btn-xs"
-              aria-label="Mark as read"
-              data-on:click="@post('/app/notifications/${notification.id}/read')"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
+      ${
+        !notification.read
+          ? html`
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs"
+                aria-label="Mark as read"
+                data-on:click="@post('/app/notifications/${notification.id}/read')"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </button>
-          `
-        : ""}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </button>
+            `
+          : ""
+      }
       <button
         type="button"
         class="btn btn-ghost btn-xs"
@@ -189,63 +195,69 @@ type NotificationsPageState = {
 // Content renderer (SSE-compatible fragment with stable id)
 const renderNotificationsContent = (state: NotificationsPageState) => html`
   <div id="notifications-content">
-    ${state.notifications.length > 0
-      ? html`
-          <div class="flex items-center justify-between mb-4">
-            <p class="text-sm text-base-content/60">
-              ${state.unreadCount > 0
-                ? `${state.unreadCount} unread`
-                : "All caught up"}
-            </p>
-            <div class="flex gap-2">
-              ${state.unreadCount > 0
-                ? html`
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      data-on:click="@post('/app/notifications/read-all')"
-                    >
-                      Mark all read
-                    </button>
-                  `
-                : ""}
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm text-error"
-                data-on:click="@post('/app/notifications/clear-all')"
-              >
-                Clear all
-              </button>
-            </div>
-          </div>
-          ${Card({
-            children: html`
-              <div class="divide-y divide-base-300">
-                ${state.notifications.map(NotificationListItem)}
+    ${
+      state.notifications.length > 0
+        ? html`
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-sm text-base-content/60">
+                ${
+                  state.unreadCount > 0
+                    ? `${state.unreadCount} unread`
+                    : "All caught up"
+                }
+              </p>
+              <div class="flex gap-2">
+                ${
+                  state.unreadCount > 0
+                    ? html`
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-sm"
+                          data-on:click="@post('/app/notifications/read-all')"
+                        >
+                          Mark all read
+                        </button>
+                      `
+                    : ""
+                }
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm text-error"
+                  data-on:click="@post('/app/notifications/clear-all')"
+                >
+                  Clear all
+                </button>
               </div>
-            `,
-          })}
-        `
-      : html`
-          <div class="text-center py-12">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-12 w-12 mx-auto mb-4 text-base-content/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-            <p class="text-base-content/50">No notifications yet</p>
-          </div>
-        `}
+            </div>
+            ${Card({
+              children: html`
+                <div class="divide-y divide-base-300">
+                  ${state.notifications.map(NotificationListItem)}
+                </div>
+              `,
+            })}
+          `
+        : html`
+            <div class="text-center py-12">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-12 w-12 mx-auto mb-4 text-base-content/30"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              <p class="text-base-content/50">No notifications yet</p>
+            </div>
+          `
+    }
   </div>
 `;
 
