@@ -1,3 +1,4 @@
+import { createSessionStream } from "../auth/session-stream.ts";
 import type { Context } from "hono";
 import { html } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -91,21 +92,20 @@ export const createFormResource = <
     const body = await c.req.json();
     const connectionId: string = body.cid || "";
 
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
+    const sessionStream = createSessionStream(c);
 
     const sendState = async () => {
       try {
+        if (!(await sessionStream.check())) return;
         const state = await options.loadState(user, c, connectionId);
         const rendered = await options.render(state);
-        await writer.write(encoder.encode(patchElementEvent(rendered)));
+        await sessionStream.send(patchElementEvent(rendered));
       } catch (error) {
         console.error("SSE render error:", error);
         if (options.errorRedirect) {
           try {
-            await writer.write(
-              encoder.encode(redirectFragmentEvent(options.errorRedirect)),
+            await sessionStream.send(
+              redirectFragmentEvent(options.errorRedirect),
             );
           } catch {
             // Writer may be closed
@@ -124,10 +124,8 @@ export const createFormResource = <
         )
       ) {
         if (options.successRedirect) {
-          writer
-            .write(
-              encoder.encode(redirectFragmentEvent(options.successRedirect)),
-            )
+          sessionStream
+            .send(redirectFragmentEvent(options.successRedirect))
             .catch(() => {});
           return;
         }
@@ -145,22 +143,15 @@ export const createFormResource = <
       );
     }
 
-    c.req.raw.signal.addEventListener("abort", () => {
+    sessionStream.onClose(() => {
       unsubscribeUser();
       unsubscribeConnection?.();
       if (connectionId) {
         formErrorStore.clearErrors(connectionId);
       }
-      writer.close();
     });
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return sessionStream.response;
   };
 
   return { container, postHandler, sseHandler };

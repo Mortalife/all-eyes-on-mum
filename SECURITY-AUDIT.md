@@ -1,18 +1,34 @@
 Security audit — 2026-11-11
 
-Implementation update: the application now checks Cloudflare's `X-Origin-Secret`
-against the runtime `ORIGIN_SECRET` before session handling, rate limiting, and
-serving application routes/assets. Production requires the secret; the minimal
-`GET /health` endpoint remains public. This addresses finding 3 after deployment
-with the matching Cloudflare request-header rule. Automated tests cover rejection,
-proxy-header spoofing, preserved login requirements, and configuration failures;
-live deployment verification remains outstanding.
+Implementation update: all application findings below have been addressed in the
+working tree. The original findings are retained as the audit record; their old
+line references describe the pre-fix source.
 
-Deployment clarification: the user deploys the Dockerfile through Coolify, with
-Cloudflare → Traefik → app on port 3000. The Compose RustFS service is not used,
-so finding 1 does not apply to this deployment. Other findings remain open.
+- Finding 1 does not apply: this deployment builds the Dockerfile in Coolify and
+  routes Cloudflare → Traefik → app. It does not deploy the Compose RustFS service.
+- Finding 2: public registration is closed. A local container command creates a
+  one-time admin setup link, and refuses to reset active accounts.
+- Finding 3: the required production origin secret rejects direct requests before
+  session loading, rate limiting, or serving app routes/assets. Only the minimal
+  health endpoint is public. Live verification is still required after deployment.
+- Finding 4: atomic SQLite counters enforce IP/account limits and bounded account
+  cooldowns. Structured security events omit credentials. Counters survive process
+  restart and are shared across processes using the same SQLite database.
+- Finding 5: both SSE implementations use a shared session-aware lifecycle, check
+  before sending data, close on local revocation, and poll idle streams every 15
+  seconds to detect expiry and changes made by another process.
+- Finding 6: versioned 600,000-iteration hashes replace legacy hashes on successful
+  login; existing passwords remain valid.
+- Additional hardening: POST-only logout, logout-all-devices, no-store responses,
+  atomic invitation consumption and replacement, equivalent password work for
+  missing accounts, a 90-day absolute session lifetime, and production defaults.
 
-The application rejects unauthenticated requests at its app/admin route boundaries, but the authentication system and deployment defaults have security gaps. This audit reviewed the current working tree, including existing uncommitted changes. No application code or deployment settings were changed.
+Validation: 39 automated tests passed, including the app route boundary,
+concurrent throttling and invite redemption, legacy hash migration, CSRF logout,
+stream revocation/expiry/storage failures, and revocation during rendering. The
+production build passed. Tests used isolated temporary databases; no live user
+records or deployed configuration were changed. Operational alert delivery and
+production proxy/cache verification remain deployment tasks.
 
 Scope: route authentication, admin authorization, login throttling, initial registration, session lifecycle, invitation handling, password storage, and supplied deployment configuration. Tests ran in-process against the actual Hono app with a fresh temporary SQLite database and synthetic users. No production traffic or production data was used. Live firewall, Cloudflare, Traefik, TLS, backup permissions, and deployed versions were not inspected. This is not a comprehensive dependency, XSS, or infrastructure penetration test.
 

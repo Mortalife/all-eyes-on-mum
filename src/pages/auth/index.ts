@@ -3,21 +3,22 @@ import { html } from "hono/html";
 import { z } from "zod";
 import {
   createSession,
-  createUser,
   deleteSession,
   deleteUserSessions,
-  emailExists,
-  isAdminEmail,
-  isRegistrationOpen,
   setUserPassword,
   verifyUserCredentials,
 } from "../../lib/auth/index.ts";
 import {
   clearSessionCookie,
-  getSessionToken,
   setSessionCookie,
 } from "../../lib/auth/middleware.ts";
-import { rateLimit } from "../../lib/auth/rate-limit.ts";
+import {
+  rateLimit,
+  consumeAuthAttempt,
+  clearLoginAttempts,
+  securityEvent,
+  throttledResponse,
+} from "../../lib/auth/rate-limit.ts";
 import {
   consumeRegistrationToken,
   validateRegistrationToken,
@@ -28,32 +29,33 @@ import { BaseLayout } from "../../ui/layouts/index.ts";
 
 export const authRouter = new Hono<HonoContext>();
 
-const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 });
-const registerRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 5,
+const loginRateLimit = rateLimit({
+  bucket: "login-ip",
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
 });
 const inviteRegisterRateLimit = rateLimit({
+  bucket: "invite-ip",
   windowMs: 60 * 60 * 1000,
   maxRequests: 10,
 });
 
 // Validation schemas
 const loginSchema = z.object({
-  email: z.email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const registerSchema = z.object({
-  email: z.email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  name: z.string().min(1, "Name is required"),
+  email: z.string().trim().toLowerCase().pipe(z.email("Invalid email address")),
+  password: z.string().min(1, "Password is required").max(1024),
 });
 
 const inviteRegisterSchema = z
   .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+    password: z
+      .string()
+      .min(12, "Password must be at least 12 characters")
+      .max(1024),
+    confirmPassword: z
+      .string()
+      .min(1, "Please confirm your password")
+      .max(1024),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -91,11 +93,9 @@ const AuthLayout = ({
 const LoginForm = ({
   email = "",
   error,
-  showRegisterLink,
 }: {
   email?: string;
   error?: string;
-  showRegisterLink: boolean;
 }) => html`
   ${error ? Alert({ type: "error", message: error }) : ""}
   <form
@@ -135,91 +135,6 @@ const LoginForm = ({
     <div class="form-control mt-6">
       ${Button({ children: "Login", type: "submit", variant: "primary" })}
     </div>
-    ${
-      showRegisterLink
-        ? html`
-            <p class="text-center text-sm mt-4">
-              Don't have an account?
-              <a href="/auth/register" class="link link-primary">Register</a>
-            </p>
-          `
-        : ""
-    }
-  </form>
-`;
-
-// Register form component
-const RegisterForm = ({
-  name = "",
-  email = "",
-  error,
-}: {
-  name?: string;
-  email?: string;
-  error?: string;
-}) => html`
-  ${error ? Alert({ type: "error", message: error }) : ""}
-  <form
-    method="POST"
-    action="/auth/register"
-    class="space-y-4 ${error ? "mt-4" : ""}"
-  >
-    ${FormField({
-      label: "Name",
-      htmlFor: "name",
-      children: html`
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value="${name}"
-          class="input input-bordered w-full"
-          required
-          autocomplete="name"
-        />
-      `,
-    })}
-    ${FormField({
-      label: "Email",
-      htmlFor: "email",
-      children: html`
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value="${email}"
-          class="input input-bordered w-full"
-          required
-          autocomplete="email"
-        />
-      `,
-    })}
-    ${FormField({
-      label: "Password",
-      htmlFor: "password",
-      children: html`
-        <input
-          type="password"
-          id="password"
-          name="password"
-          class="input input-bordered w-full"
-          required
-          minlength="8"
-          autocomplete="new-password"
-        />
-      `,
-    })}
-    <div class="form-control mt-6">
-      ${Button({
-        children: "Create Admin Account",
-        type: "submit",
-        variant: "primary",
-      })}
-    </div>
-    <p class="text-center text-sm mt-4">
-      Already have an account?
-      <a href="/auth/login" class="link link-primary">Login</a>
-    </p>
   </form>
 `;
 
@@ -230,12 +145,10 @@ authRouter.get("/login", async (c) => {
     return c.redirect("/app");
   }
 
-  const registrationOpen = await isRegistrationOpen();
-
   return c.html(
     AuthLayout({
       title: "Login",
-      children: LoginForm({ showRegisterLink: registrationOpen }),
+      children: LoginForm({}),
     }),
   );
 });
@@ -248,8 +161,6 @@ authRouter.post("/login", loginRateLimit, async (c) => {
     password: formData.get("password") as string,
   };
 
-  const registrationOpen = await isRegistrationOpen();
-
   const parsed = loginSchema.safeParse(data);
   if (!parsed.success) {
     return c.html(
@@ -258,157 +169,47 @@ authRouter.post("/login", loginRateLimit, async (c) => {
         children: LoginForm({
           email: data.email,
           error: parsed.error.issues[0].message,
-          showRegisterLink: registrationOpen,
         }),
       }),
     );
   }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const retryAfter = await consumeAuthAttempt(email, {
+    bucket: "login-account",
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 10,
+    progressive: true,
+  });
+  if (retryAfter) return throttledResponse(c, retryAfter);
 
   const user = await verifyUserCredentials(
     parsed.data.email,
     parsed.data.password,
   );
   if (!user) {
+    securityEvent("login_failed", "account", email);
     return c.html(
       AuthLayout({
         title: "Login",
         children: LoginForm({
           email: data.email,
           error: "Invalid email or password",
-          showRegisterLink: registrationOpen,
         }),
       }),
     );
   }
 
+  await clearLoginAttempts(email);
+  securityEvent("login_succeeded", "account", email);
   const token = await createSession(user.id);
   setSessionCookie(c, token);
 
   return c.redirect("/app");
 });
 
-// Register page - only available if admin doesn't exist yet
-authRouter.get("/register", async (c) => {
-  const user = c.get("user");
-  if (user) {
-    return c.redirect("/app");
-  }
-
-  // Check if registration is still open
-  const registrationOpen = await isRegistrationOpen();
-  if (!registrationOpen) {
-    return c.html(
-      AuthLayout({
-        title: "Registration Closed",
-        children: html`
-          ${Alert({
-            type: "info",
-            message:
-              "Public registration is closed. Please contact an administrator to create an account.",
-          })}
-          <div class="mt-4">
-            <a href="/auth/login" class="link link-primary">Back to login</a>
-          </div>
-        `,
-      }),
-    );
-  }
-
-  return c.html(
-    AuthLayout({
-      title: "Create Admin Account",
-      children: html`
-        <p class="text-base-content/70 mb-4">
-          Set up your admin account to get started. Only the configured admin
-          email can register.
-        </p>
-        ${RegisterForm({})}
-      `,
-    }),
-  );
-});
-
-// Register handler
-authRouter.post("/register", registerRateLimit, async (c) => {
-  const formData = await c.req.formData();
-  const data = {
-    name: formData.get("name") as string,
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  };
-
-  // Check if registration is still open
-  const registrationOpen = await isRegistrationOpen();
-  if (!registrationOpen) {
-    return c.html(
-      AuthLayout({
-        title: "Registration Closed",
-        children: html`
-          ${Alert({
-            type: "error",
-            message:
-              "Registration is closed. The admin account has already been created.",
-          })}
-          <div class="mt-4">
-            <a href="/auth/login" class="link link-primary">Back to login</a>
-          </div>
-        `,
-      }),
-    );
-  }
-
-  const parsed = registerSchema.safeParse(data);
-  if (!parsed.success) {
-    return c.html(
-      AuthLayout({
-        title: "Create Admin Account",
-        children: RegisterForm({
-          name: data.name,
-          email: data.email,
-          error: parsed.error.issues[0].message,
-        }),
-      }),
-    );
-  }
-
-  // Only allow the configured admin email to register
-  if (!isAdminEmail(parsed.data.email)) {
-    return c.html(
-      AuthLayout({
-        title: "Create Admin Account",
-        children: RegisterForm({
-          name: data.name,
-          error: "Only the configured admin email can register",
-        }),
-      }),
-    );
-  }
-
-  // Check if email already exists
-  if (await emailExists(parsed.data.email)) {
-    return c.html(
-      AuthLayout({
-        title: "Create Admin Account",
-        children: RegisterForm({
-          name: data.name,
-          error: "An account with this email already exists",
-        }),
-      }),
-    );
-  }
-
-  // Create admin user and session
-  const user = await createUser(
-    parsed.data.email,
-    parsed.data.password,
-    parsed.data.name,
-    "admin",
-  );
-  const token = await createSession(user.id);
-  setSessionCookie(c, token);
-
-  return c.redirect("/app");
-});
+// Admin bootstrap is only available through the local setup command.
+authRouter.all("/register", (c) => c.text("Registration closed", 403));
 
 // Invite registration form component - for users setting their password via invite link
 const InviteRegisterForm = ({
@@ -442,7 +243,7 @@ const InviteRegisterForm = ({
           name="password"
           class="input input-bordered w-full"
           required
-          minlength="8"
+          minlength="12"
           autocomplete="new-password"
         />
       `,
@@ -458,7 +259,7 @@ const InviteRegisterForm = ({
           name="confirmPassword"
           class="input input-bordered w-full"
           required
-          minlength="8"
+          minlength="12"
           autocomplete="new-password"
         />
       `,
@@ -597,16 +398,18 @@ authRouter.post("/register/:token", inviteRegisterRateLimit, async (c) => {
 });
 
 // Logout handler
-authRouter.get("/logout", async (c) => {
-  const token = getSessionToken(c);
-
-  if (token) {
-    const parts = token.split(".");
-    if (parts[0]) {
-      await deleteSession(parts[0]);
-    }
-  }
+authRouter.post("/logout", async (c) => {
+  const session = c.get("session");
+  if (session) await deleteSession(session.token);
 
   clearSessionCookie(c);
   return c.redirect("/");
+});
+
+// Revoke every device, including this session.
+authRouter.post("/logout-all", async (c) => {
+  const user = c.get("user");
+  if (user) await deleteUserSessions(user.id);
+  clearSessionCookie(c);
+  return c.redirect("/auth/login");
 });

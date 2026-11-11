@@ -4,6 +4,7 @@ import { client } from "../db.ts";
 import {
   generateSecureRandomString,
   hashPassword,
+  needsPasswordUpgrade,
   verifyPassword,
 } from "./crypto.ts";
 
@@ -22,12 +23,20 @@ export const createUser = async (
   await client.execute({
     sql: `INSERT INTO user (id, email, name, password_hash, role, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, email.toLowerCase(), name || null, passwordHash, role, now, now],
+    args: [
+      id,
+      email.trim().toLowerCase(),
+      name || null,
+      passwordHash,
+      role,
+      now,
+      now,
+    ],
   });
 
   return {
     id,
-    email: email.toLowerCase(),
+    email: email.trim().toLowerCase(),
     name: name || null,
     role,
     createdAt: new Date(now * 1000).toISOString(),
@@ -53,7 +62,7 @@ export const setUserPassword = async (
 export const findUserByEmail = async (email: string): Promise<User | null> => {
   const result = await client.execute({
     sql: "SELECT id, email, name, role, created_at, updated_at FROM user WHERE email = ?",
-    args: [email.toLowerCase()],
+    args: [email.trim().toLowerCase()],
   });
 
   if (result.rows.length === 0) return null;
@@ -77,19 +86,24 @@ export const verifyUserCredentials = async (
 ): Promise<User | null> => {
   const result = await client.execute({
     sql: "SELECT id, email, name, role, password_hash, created_at, updated_at FROM user WHERE email = ?",
-    args: [email.toLowerCase()],
+    args: [email.trim().toLowerCase()],
   });
 
-  if (result.rows.length === 0) return null;
-
   const row = result.rows[0];
-  const passwordHash = row.password_hash as string | null;
-
-  // User hasn't set a password yet (invite pending)
-  if (!passwordHash) return null;
+  const passwordHash = (row?.password_hash as string | null) ?? null;
 
   const valid = await verifyPassword(password, passwordHash);
-  if (!valid) return null;
+  if (!valid || !row || !passwordHash) return null;
+
+  if (needsPasswordUpgrade(passwordHash)) {
+    const upgraded = await hashPassword(password);
+    // Do not overwrite a password changed concurrently.
+    const updated = await client.execute({
+      sql: "UPDATE user SET password_hash = ? WHERE id = ? AND password_hash = ? RETURNING id",
+      args: [upgraded, row.id, passwordHash],
+    });
+    if (updated.rows.length === 0) return null;
+  }
 
   return {
     id: row.id as string,
@@ -105,7 +119,7 @@ export const verifyUserCredentials = async (
 export const emailExists = async (email: string): Promise<boolean> => {
   const result = await client.execute({
     sql: "SELECT 1 FROM user WHERE email = ?",
-    args: [email.toLowerCase()],
+    args: [email.trim().toLowerCase()],
   });
   return result.rows.length > 0;
 };
@@ -117,16 +131,6 @@ export const adminExists = async (): Promise<boolean> => {
     args: [env.ADMIN_EMAIL.toLowerCase()],
   });
   return result.rows.length > 0;
-};
-
-// Checks if public registration is allowed (only if admin doesn't exist yet)
-export const isRegistrationOpen = async (): Promise<boolean> => {
-  return !(await adminExists());
-};
-
-// Checks if an email is the configured admin email
-export const isAdminEmail = (email: string): boolean => {
-  return email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase();
 };
 
 // Finds a user by ID

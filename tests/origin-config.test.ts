@@ -44,3 +44,11 @@ it("enforces a configured secret in development too", async () => {
       .status,
   ).toBe(200);
 });
+
+it("defaults to production protection when NODE_ENV is omitted", async () => {
+  vi.stubEnv("NODE_ENV", undefined);
+  vi.stubEnv("ORIGIN_SECRET", undefined);
+  await expect(import("../src/env.ts")).rejects.toThrow(
+    "ORIGIN_SECRET is required in production",
+  );
+});

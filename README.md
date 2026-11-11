@@ -137,7 +137,49 @@ is rejected (replace the hostname and IP):
 curl -i --resolve mum.example.com:443:203.0.113.10 https://mum.example.com/auth/login
 ```
 
-This is family-only software. The configured admin email can register first, then creates accounts for other family members. No public registration.
+This is family-only software. Public admin registration is disabled. Existing
+accounts continue to work without any setup step.
+
+For a fresh installation, open the application container's terminal in Coolify and run:
+
+```bash
+node dist/setup-admin.js
+```
+
+The command uses `ADMIN_EMAIL` and `BASE_URL` from the container environment and
+prints a private, single-use setup URL valid for 24 hours. Open that URL through
+your normal Cloudflare domain to choose the admin password. Do not share the URL.
+The command refuses to reset an active admin. If setup was interrupted before a
+password was set, rerunning it replaces the pending setup link. In development,
+use `node --env-file=.env src/setup-admin.ts` after creating the database directory.
+Admins can then invite family members from the app.
+
+Login attempts are limited to 10 per IP per 15 minutes and 10 per normalized
+account per 15 minutes. After the fifth account attempt, increasing cooldowns
+apply (1, 2, 4, 8, then 16 seconds); the tenth attempt exhausts the window.
+Rejected attempts do not extend the cooldown. A successful login clears that
+account's counter, while its IP counter remains. Counters persist in SQLite and
+are shared by processes using the same database, not by independent database
+replicas. Invitation submissions share a 10-per-IP hourly allowance across URLs.
+
+Failed logins, successful logins, and throttling produce structured JSON security
+logs in the application output. Subjects are hashed email/IP identifiers;
+passwords, cookies, and invitation URLs are not included in these events. Monitor
+these events in your logging system; external alert delivery is not configured.
+
+Passwords use versioned PBKDF2-SHA256 hashes with 600,000 iterations. Existing
+100,000-iteration hashes are verified and upgraded on successful login. Unknown
+and pending accounts still perform password work to reduce timing differences.
+New passwords require at least 12 characters; existing shorter passwords remain
+valid. Auth request bodies are limited to 16 KiB and passwords to 1,024 characters.
+
+Logout is a CSRF-protected POST. The account menu also offers **Log out all
+devices**. Sessions have a 30-day renewable expiry capped at 90 days from login.
+Live-update streams revalidate before sending data, close immediately on local
+revocation, and check idle connections every 15 seconds for expiry or revocation
+by another process. Private pages and authentication responses use `no-store`.
+`NODE_ENV` defaults to production so missing configuration cannot silently disable
+production origin protection or secure cookies.
 
 ## Privacy
 

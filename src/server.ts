@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { sessionMiddleware } from "./lib/auth/middleware.ts";
@@ -17,6 +18,16 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 // Authenticate the proxy before serving assets, reading sessions, or rate limiting.
 app.use("*", requireTrustedOrigin);
+
+// Authentication and private data must never be stored by browsers or proxies.
+app.use("*", async (c, next) => {
+  await next();
+  const path = c.req.path;
+  if (/^\/(auth|app|admin)(\/|$)/.test(path)) {
+    c.header("Cache-Control", "no-store");
+  }
+});
+app.use("/auth/*", bodyLimit({ maxSize: 16 * 1024 }));
 
 // CSRF protection
 app.use(csrf());

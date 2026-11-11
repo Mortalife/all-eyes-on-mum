@@ -1,3 +1,7 @@
+import {
+  notifySessionRevoked,
+  notifyUserSessionsRevoked,
+} from "./session-events.ts";
 import type { User } from "../../types/user.ts";
 import type { Session } from "../../types/hono.ts";
 import { client } from "../db.ts";
@@ -8,6 +12,7 @@ import {
 } from "./crypto.ts";
 
 // Session expiry: 30 days
+const ABSOLUTE_SESSION_SECONDS = 90 * 24 * 60 * 60;
 const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Creates a new session for a user, returns the token
@@ -60,7 +65,10 @@ export const validateSessionToken = async (
   const now = Math.floor(Date.now() / 1000);
 
   // Check if session is expired
-  if ((row.expires_at as number) < now) {
+  if (
+    (row.expires_at as number) <= now ||
+    (row.created_at as number) + ABSOLUTE_SESSION_SECONDS <= now
+  ) {
     await deleteSession(sessionId);
     return null;
   }
@@ -76,7 +84,12 @@ export const validateSessionToken = async (
   const session: Session = {
     token: sessionId,
     userId: row.user_id as string,
-    expiresAt: new Date((row.expires_at as number) * 1000).toISOString(),
+    expiresAt: new Date(
+      Math.min(
+        row.expires_at as number,
+        (row.created_at as number) + ABSOLUTE_SESSION_SECONDS,
+      ) * 1000,
+    ).toISOString(),
   };
 
   const user: User = {
@@ -97,6 +110,7 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
     sql: "DELETE FROM session WHERE id = ?",
     args: [sessionId],
   });
+  notifySessionRevoked(sessionId);
 };
 
 // Deletes all sessions for a user
@@ -105,13 +119,18 @@ export const deleteUserSessions = async (userId: string): Promise<void> => {
     sql: "DELETE FROM session WHERE user_id = ?",
     args: [userId],
   });
+  notifyUserSessionsRevoked(userId);
 };
 
 // Extends session expiry (call periodically to keep session alive)
 export const extendSession = async (sessionId: string): Promise<void> => {
   const now = Date.now();
   await client.execute({
-    sql: "UPDATE session SET expires_at = ? WHERE id = ?",
-    args: [Math.floor((now + SESSION_EXPIRY_MS) / 1000), sessionId],
+    sql: "UPDATE session SET expires_at = MIN(?, created_at + ?) WHERE id = ?",
+    args: [
+      Math.floor((now + SESSION_EXPIRY_MS) / 1000),
+      ABSOLUTE_SESSION_SECONDS,
+      sessionId,
+    ],
   });
 };

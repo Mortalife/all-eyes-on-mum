@@ -1,3 +1,4 @@
+import { createSessionStream } from "../auth/session-stream.ts";
 import type { Context } from "hono";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { HonoContext } from "../../types/hono.ts";
@@ -26,22 +27,21 @@ export const createSSEResource = <TState>(
       });
     }
 
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
+    const sessionStream = createSessionStream(c);
 
     // Sends the current state to the client
     const sendState = async () => {
       try {
+        if (!(await sessionStream.check())) return;
         const state = await options.loadState(user, c);
         const html = await options.render(state);
-        await writer.write(encoder.encode(patchElementEvent(html)));
+        await sessionStream.send(patchElementEvent(html));
       } catch (error) {
         console.error("SSE render error:", error);
         if (options.errorRedirect) {
           try {
-            await writer.write(
-              encoder.encode(redirectFragmentEvent(options.errorRedirect)),
+            await sessionStream.send(
+              redirectFragmentEvent(options.errorRedirect),
             );
           } catch {
             // Writer may be closed
@@ -62,10 +62,8 @@ export const createSSEResource = <TState>(
         )
       ) {
         if (options.successRedirect) {
-          writer
-            .write(
-              encoder.encode(redirectFragmentEvent(options.successRedirect)),
-            )
+          sessionStream
+            .send(redirectFragmentEvent(options.successRedirect))
             .catch(() => {});
           return;
         }
@@ -74,17 +72,10 @@ export const createSSEResource = <TState>(
     });
 
     // Cleans up on close
-    c.req.raw.signal.addEventListener("abort", () => {
+    sessionStream.onClose(() => {
       unsubscribeUser();
-      writer.close();
     });
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+    return sessionStream.response;
   };
 };

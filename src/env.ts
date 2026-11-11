@@ -5,7 +5,9 @@ const envSchema = z
     PORT: z.coerce.number().default(3000),
     BASE_URL: z.string().default("http://localhost:3000"),
     DATABASE_PATH: z.string().optional(),
-    NODE_ENV: z.string().optional(),
+    NODE_ENV: z
+      .enum(["production", "development", "test"])
+      .default("production"),
     ORIGIN_SECRET: z.string().optional(),
     ADMIN_EMAIL: z.email("ADMIN_EMAIL must be a valid email"),
     // Phone push notifications are disabled unless both keys are set

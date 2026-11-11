@@ -1,99 +1,59 @@
-import { webcrypto } from "crypto";
+import {
+  pbkdf2 as derive,
+  randomBytes,
+  timingSafeEqual,
+  webcrypto,
+} from "node:crypto";
+import { promisify } from "node:util";
 
-const crypto = webcrypto as Crypto;
+const pbkdf2 = promisify(derive);
+export const PASSWORD_ITERATIONS = 600_000;
+const PREFIX = `pbkdf2-sha256$${PASSWORD_ITERATIONS}$`;
 
-// Alphabet without ambiguous characters (no 0, O, 1, l, I)
-const ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+export const generateSecureRandomString = (): string =>
+  randomBytes(24).toString("base64url");
 
-// Generates a cryptographically secure random string with 120+ bits of entropy
-export const generateSecureRandomString = (): string => {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  let result = "";
-  for (let i = 0; i < bytes.length; i++) {
-    result += ALPHABET[bytes[i] >> 3];
-  }
-  return result;
-};
+export const hashSecret = async (secret: string): Promise<Uint8Array> =>
+  new Uint8Array(
+    await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(secret)),
+  );
 
-// Hashes a secret using SHA-256
-export const hashSecret = async (secret: string): Promise<Uint8Array> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(secret);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return new Uint8Array(hashBuffer);
-};
+export const constantTimeEqual = (a: Uint8Array, b: Uint8Array): boolean =>
+  a.byteLength === b.byteLength && timingSafeEqual(a, b);
 
-// Constant-time comparison to prevent timing attacks
-export const constantTimeEqual = (a: Uint8Array, b: Uint8Array): boolean => {
-  if (a.byteLength !== b.byteLength) return false;
-  let c = 0;
-  for (let i = 0; i < a.byteLength; i++) {
-    c |= a[i] ^ b[i];
-  }
-  return c === 0;
-};
-
-// Hashes a password using PBKDF2 with a random salt
 export const hashPassword = async (password: string): Promise<string> => {
-  const salt = new Uint8Array(16);
-  crypto.getRandomValues(salt);
-
-  const encoder = new TextEncoder();
-  const passwordKey = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-
-  const hash = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    passwordKey,
-    256,
-  );
-
-  // Combine salt and hash, encode as base64
-  const combined = new Uint8Array(salt.length + hash.byteLength);
-  combined.set(salt);
-  combined.set(new Uint8Array(hash), salt.length);
-  return Buffer.from(combined).toString("base64");
+  const salt = randomBytes(16);
+  const hash = await pbkdf2(password, salt, PASSWORD_ITERATIONS, 32, "sha256");
+  return PREFIX + Buffer.concat([salt, hash]).toString("base64");
 };
 
-// Verifies a password against a stored hash
+export const needsPasswordUpgrade = (hash: string): boolean =>
+  !hash.startsWith(PREFIX);
+
+// A missing account still performs the same expensive password calculation.
 export const verifyPassword = async (
   password: string,
-  storedHash: string,
+  storedHash: string | null,
 ): Promise<boolean> => {
-  const combined = Buffer.from(storedHash, "base64");
-  const salt = combined.subarray(0, 16);
-  const hash = combined.subarray(16);
-
-  const encoder = new TextEncoder();
-  const passwordKey = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
+  const current = storedHash?.startsWith(PREFIX);
+  const legacy = storedHash !== null && !storedHash.includes("$");
+  const combined = Buffer.from(
+    current ? storedHash!.slice(PREFIX.length) : legacy ? storedHash! : "",
+    "base64",
   );
-
-  const newHash = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
+  const wellFormed = combined.length === 48 && (current || legacy);
+  const salt = wellFormed ? combined.subarray(0, 16) : Buffer.alloc(16);
+  const iterations = wellFormed && legacy ? 100_000 : PASSWORD_ITERATIONS;
+  const hash = await pbkdf2(password, salt, iterations, 32, "sha256");
+  // Pad legacy verification to the current work factor, including wrong passwords.
+  if (iterations < PASSWORD_ITERATIONS) {
+    await pbkdf2(
+      password,
       salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    passwordKey,
-    256,
-  );
-
-  return constantTimeEqual(new Uint8Array(newHash), new Uint8Array(hash));
+      PASSWORD_ITERATIONS - iterations,
+      32,
+      "sha256",
+    );
+  }
+  return Boolean(wellFormed && constantTimeEqual(hash, combined.subarray(16)));
 };

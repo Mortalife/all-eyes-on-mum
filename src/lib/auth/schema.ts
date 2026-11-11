@@ -2,6 +2,16 @@ import { client } from "../db.ts";
 
 // Initializes auth tables
 export const initAuthTables = async () => {
+  await client.execute(`CREATE TABLE IF NOT EXISTS auth_rate_limit (
+    key TEXT PRIMARY KEY NOT NULL,
+    count INTEGER NOT NULL,
+    reset_at INTEGER NOT NULL,
+    blocked_until INTEGER NOT NULL
+  ) STRICT`);
+  await client.execute(
+    "CREATE INDEX IF NOT EXISTS idx_auth_rate_limit_reset ON auth_rate_limit(reset_at)",
+  );
+
   // User table (password_hash is nullable for invite-based registration)
   await client.execute(`
     CREATE TABLE IF NOT EXISTS user (

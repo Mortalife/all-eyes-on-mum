@@ -307,7 +307,16 @@ export const AppLayout = ({
                   class="menu menu-sm dropdown-content bg-base-100 rounded-box z-10 mt-3 w-52 p-2 shadow"
                 >
                   <li><a href="/app/settings">Settings</a></li>
-                  <li><a href="/auth/logout">Logout</a></li>
+                  <li>
+                    <form method="POST" action="/auth/logout-all">
+                      <button type="submit">Log out all devices</button>
+                    </form>
+                  </li>
+                  <li>
+                    <form method="POST" action="/auth/logout">
+                      <button type="submit">Logout</button>
+                    </form>
+                  </li>
                 </ul>
               </div>
             </div>
