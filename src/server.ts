@@ -29,6 +29,9 @@ app.use(
   }),
 );
 
+// Service worker must be served from the root so its scope covers the whole app
+app.get("/sw.js", serveStatic({ path: "./dist-public/sw.js" }));
+
 // Session middleware - loads user from cookie
 app.use("*", sessionMiddleware);
 
